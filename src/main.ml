@@ -160,7 +160,7 @@ let check_fni f params nb_shares interns outs =
          check_all state (f ki ko) args);
       Format.eprintf "Checking of done ki = %i, ko = %i@." ki ko;
     done;
-    Format.printf "SNI@."
+    Format.printf "FNI@."
   with CanNotCheck le ->
     Format.eprintf "%a@." print_error le
 
@@ -185,6 +185,8 @@ let main_sni params nb_shares outs =
 let main_ni params nb_shares outs = 
   check_ni params nb_shares (mk_interns outs) outs
 
+let main_fni f params nb_shares outs = 
+  check_fni f params nb_shares (mk_interns outs) outs
 
 (* ------------------------------------------------------------------ *)
 
@@ -236,6 +238,13 @@ let doit1 n k =
   let refresh = refresh n "r" k [] in
   Array.iter (fun e -> Format.printf "%a@." pp_expr e) refresh;
   main_sni [a] n (List.tl (Array.to_list refresh))
+
+let doit1_fni n k = 
+  let refresh = refresh n "r" k [] in
+  Array.iter (fun e -> Format.printf "%a@." pp_expr e) refresh;
+  main_fni
+    (fun k1 k2 -> if k1 > 0 && k2 > 1 then k1 + k2 - 2 else k1)
+    [a] n (List.tl (Array.to_list refresh))
 
 let doit2 n k = 
   let refresh = refresh2 n k in
@@ -315,7 +324,9 @@ $r7,
 $r13
 *)
 (* Ok in 31m34.685s *)
-let _ = doit2 14 3
+(*let _ = doit2 14 3*)
+
+let _ = doit1_fni 5 1
 
 (* Ok *)
 (* let _ = doit2 15 3 *)
