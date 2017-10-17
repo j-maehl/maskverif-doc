@@ -1,0 +1,66 @@
+inlining done in 0.000
+(i1_20, i2_20, i3_20, i4_20, i5_20, i6_20, i7_20, i8_20, i9_20)
+(i1_30, i2_30, i3_30, i4_30, i5_30, i6_30, i7_30, i8_30, i9_30)
+(i1_40, i2_40, i3_40, i4_40, i5_40, i6_40, i7_40, i8_40, i9_40)
+(i1_50, i2_50, i3_50, i4_50, i5_50, i6_50, i7_50, i8_50, i9_50)
+after derandomize:
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+Context : Mult.refresh_r
+
+pre = true
+
+( 1)  r10 <$ Byte.distr                                                               
+( 2)  r20 <$ Byte.distr                                                               
+( 3)  r30 <$ Byte.distr                                                               
+( 4)  r40 <$ Byte.distr                                                               
+( 5)  r50 <$ Byte.distr                                                               
+( 6)  r60 <$ Byte.distr                                                               
+( 7)  r70 <$ Byte.distr                                                               
+( 8)  r80 <$ Byte.distr                                                               
+( 9)  r90 <$ Byte.distr                                                               
+(10)  r1 <- r10                                                                       
+(11)  r2 <- r20                                                                       
+(12)  r3 <- r30                                                                       
+(13)  r4 <- r40                                                                       
+(14)  r5 <- r50                                                                       
+(15)  r6 <- r60                                                                       
+(16)  r7 <- r70                                                                       
+(17)  r8 <- r80                                                                       
+(18)  r9 <- r90                                                                       
+(19)  (i1_2, i2_2, i3_2, i4_2, i5_2, i6_2, i7_2, i8_2, i9_2) <-                       
+(  )    (r1, r2, r3, r4, r5, r6, r7, r8, r9)                                          
+(20)  (i1_20, i2_20, i3_20, i4_20, i5_20, i6_20, i7_20, i8_20, i9_20) <-              
+(  )    (i1_2, i2_2, i3_2, i4_2, i5_2, i6_2, i7_2, i8_2, i9_2)                        
+(21)  (i1_3, i2_3, i3_3, i4_3, i5_3, i6_3, i7_3, i8_3, i9_3) <-                       
+(  )    (r9, r1, r2, r3, r4, r5, r6, r7, r8)                                          
+(22)  (i1_30, i2_30, i3_30, i4_30, i5_30, i6_30, i7_30, i8_30, i9_30) <-              
+(  )    (i1_3, i2_3, i3_3, i4_3, i5_3, i6_3, i7_3, i8_3, i9_3)                        
+(23)  (i1_4, i2_4, i3_4, i4_4, i5_4, i6_4, i7_4, i8_4, i9_4) <-                       
+(  )    ((a1 + i1_2)%Byte.ComRing, (a2 + i2_2)%Byte.ComRing,                          
+(  )     (a3 + i3_2)%Byte.ComRing, (a4 + i4_2)%Byte.ComRing,                          
+(  )     (a5 + i5_2)%Byte.ComRing, (a6 + i6_2)%Byte.ComRing,                          
+(  )     (a7 + i7_2)%Byte.ComRing, (a8 + i8_2)%Byte.ComRing, (a9 + i9_2)%Byte.ComRing)
+(24)  (i1_40, i2_40, i3_40, i4_40, i5_40, i6_40, i7_40, i8_40, i9_40) <-              
+(  )    (i1_4, i2_4, i3_4, i4_4, i5_4, i6_4, i7_4, i8_4, i9_4)                        
+(25)  (i1_5, i2_5, i3_5, i4_5, i5_5, i6_5, i7_5, i8_5, i9_5) <-                       
+(  )    ((i1_4 + i1_3)%Byte.ComRing, (i2_4 + i2_3)%Byte.ComRing,                      
+(  )     (i3_4 + i3_3)%Byte.ComRing, (i4_4 + i4_3)%Byte.ComRing,                      
+(  )     (i5_4 + i5_3)%Byte.ComRing, (i6_4 + i6_3)%Byte.ComRing,                      
+(  )     (i7_4 + i7_3)%Byte.ComRing, (i8_4 + i8_3)%Byte.ComRing,                      
+(  )     (i9_4 + i9_3)%Byte.ComRing)                                                  
+(26)  (i1_50, i2_50, i3_50, i4_50, i5_50, i6_50, i7_50, i8_50, i9_50) <-              
+(  )    (i1_5, i2_5, i3_5, i4_5, i5_5, i6_5, i7_5, i8_5, i9_5)                        
+
+post = true
+
+length f_args = 9
+wp computed in 0.000
+Start i = 8
+Start output = 7, internal = 1 
+Start output = 6, internal = 2 
+NOT SNI
+TIME: 0.926

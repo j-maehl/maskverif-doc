@@ -1,0 +1,181 @@
+
+Verifier le nombre de share pour proof : 2 c'est certainement 1 seul 
+shares  |  bmasking  | prouf  | new  |
+2       |  2         | 1      | 1    |
+3       |  3         | 3      | 3    |
+4       |  4         | 4      | 4    |
+5       |  10        | 8      | 6    | new     
+6       |  12        | 12     | 9    | new
+7       |  14        | 15     | 11   | new
+8       |  24        | 16     | 13   | new (francois)
+9       |  27        | 22     | 17   | new (francois)
+10      |  30        | 26     | 22   |
+11      |            | 30     | 25   | 
+12      |            | 36     | 30   |
+13                            | 32   | 
+14                            | 36   |    
+
+
+let rec refresh c = 
+  match c with
+  | x when x <= 1 -> assert false
+  | 2 -> 1
+  | 3 -> 3
+  | 4 -> 4
+  | 5 -> 6
+  | 6 -> 9
+  | 7 -> 11
+  | 8 -> 13
+  | 9 -> 15
+  | _ ->
+    let c2 = c/2 in
+    2*c2 + refresh c2 + refresh (c - c2);;
+
+1 r1 2 3 r1 4 5 r2 6 7 r2 8 9 r3 r3     
+ 
+......................
+ 
+1    2 3    4 5    6 7    8 9
+_ r1 _ _ r1 _ _ r2 _ _ r2 _ _ 
+
+multiplication :
+shares | ISW Mul | New Refresh | new SNI      | new NI  | Sonia NI
+2      |    1    |   1         | 1            | 1       | 1     
+3      |    3    |   3         | 3            | 3       | 3     
+4      |    6    |   4         | 5  (o3, bis) | 4       | 4     
+5      |   10    |   6         | 10 ...       | 5       | 5             
+6      |   15    |   9         | 13 (o5, bis) | 12      | 11        
+7      |   21    |  11         | 21           | 14      | 15        
+8      |   28    |  13         | 24 (17 ???)  | 16??    | 19    
+9      |   36    |  15         | 27 ???       | 18??    | 24    
+10     |   45    |  22 
+11     |   55    |  25 
+12     |   66    |  30 
+13     |   78    |  32 
+14     |   91    |  36 
+15     |  105    |  38 
+16     |  120    |  42 
+17     |  136    |  46 
+18     |  153    |  48
+19     |  171    |  55
+20     |  190    |  64 
+21     |  210    |  67 
+22     |  231    |  72 
+23     |  253    |  77 
+24     |  276    |  84 
+25     |  300    |  86 
+26     |  325    |  90 
+27     |  351    |  94 
+28     |  378    | 100
+29     |  406    | 102
+30     |  435    | 106
+
+
+
+--- Order3 : 4 shares, 5 rnd ---- OK
+a1b1  r1  a1b4  a4b1  r4  a1b3  r5
+a2b2  r2  a2b1  a1b2  r1  a2b4  r5
+a3b3  r3  a3b2  a2b3  r2  a3b1  r5
+a4b4  r4  a4b3  a3b4  r3  a4b2  r5
+
+--- Order4 : 5 shares, 10 rnd ---- OK
+a1b1 r1  a1b5   a5b1 r5  a1b4  a4b1  r1' r5'
+a2b2 r2  a2b1   a1b2 r1  a2b5  a5b2  r2' r1'
+a3b3 r3  a3b2   a2b3 r2  a3b1  a1b3  r3' r2'
+a4b4 r4  a4b3   a3b4 r3  a4b2  a2b4  r4' r3'
+a5b5 r5  a5b4   a4b5 r4  a5b3  a3b5  r5' r4'
+
+--- Order4 : 5 shares, 10 rnd ---- OK
+a1b1 r1  a1b5   a5b1 r5  a1b4  a4b1  r1' r5'   {1 4 5} 
+a2b2 r2  a2b1   a1b2 r1  a2b5  a5b2  r2' r1'   {1 2 5 }
+a3b3 r3  a3b2   a2b3 r2  a3b1  a1b3  r3' r2'   {1 2 3 }
+a4b4 r4  a4b3   a3b4 r3  a4b2  a2b4  r4' r3'   {
+a5b5 r5  a5b4   a4b5 r4  a5b3  a3b5  r5' r4'
+
+--- Order5 : 6 shares, 12 rnd ---- OK
+a1b1 r1  a1b6   a6b1 r6  a1b5  a5b1  r1' a1b4 r6'
+a2b2 r2  a2b1   a1b2 r1  a2b6  a6b2  r2' a2b5 r1'
+a3b3 r3  a3b2   a2b3 r2  a3b1  a1b3  r3' a3b6 r2'
+a4b4 r4  a4b3   a3b4 r3  a4b2  a2b4  r4' a4b1 r3'
+a5b5 r5  a5b4   a4b5 r4  a5b3  a3b5  r5' a5b2 r4'
+a6b6 r6  a6b5   a5b6 r5  a6b4  a4b6  r6' a6b3 r5'  
+
+--- Order6 : 7 shares, 21 rnd ---- OK
+
+--- Order7 : 8 shares, 24 rnd ---- ??
+
+
+......................
+ 
+1    2 3    4 5    6 7    8 9
+_ r1 _ _ r1 _ _ r2 _ _ r2 _ _ 
+
+
+
+(* ---------------------------------------------------------- *)
+-----------   Demi Refresh  -------------
+
+          ki | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+nb shares 4  | Y | Y | Y | Y | _ | _ | _ | _ | _      
+          5  | Y | Y | Y | Y | Y | _ | _ | _ | _      
+          6  | Y | Y | N | Y | Y | Y | _ | _ | _
+          7  | Y | Y | N | N | Y | Y | Y | _ | _
+          8  | Y | Y | N | N | N | Y | Y | Y | _
+          9  | Y | Y | N | N | N | N | Y | Y | Y
+
+
+
+r2,
+a6 + r6,
+a1 + r1 + r7,
+r2 + r1,
+a7 + r7 + r6,
+r4)
+
+(a6 + r6,
+ a1 + r1 + r7,
+ r2 + r1,
+ a7 + r7 + r6,
+)
+
+3 out, 1 int ->  3 inp
+
+
+13  6 + 7
+
+(*
+r0  + r13 + s0  + s11 + a0   
+r1  + r0  + s1  + s12 + a1  
+r2  + r1  + s2  + s13 + a2  
+r3  + r2  + s3  + s0  + a3  
+r4  + r3  + s4  + s1  + a4  
+r5  + r4  + s5  + s2  + a5  
+r6  + r5  + s6  + s3  + a6  
+r7  + r6  + s7  + s4  + a7  
+r8  + r7  + s8  + s5  + a8  
+r9  + r8  + s9  + s6  + a9 
+r10 + r9  + s10 + s7  + a10 
+r11 + r10 + s11 + s8  + a11 
+r12 + r11 + s12 + s9  + a12 
+r13 + r12 + s13 + s10 + a13
+*)
+
+(*r0  + r13 + s0  + s11 + a0*)
+r1  
+      r0  + s1  + s12 + a1  
+r2  + r1  + s2  + s13 + a2  
+r3  + r2  + s3  + s0  + a3  
+r4  + r3  + s4  + s1  + a4  
+r5  + r4  + s5  + s2  + a5  
+r6  + r5  + s6  + s3  + a6  
+r7  + r6  + s7  + s4  + a7  
+r8  + r7  + s8  + s5  + a8  
+r9  + r8  + s9  + s6  + a9 
+r10 + r9  + s10 + s7  + a10 
+r11 + r10  
+            s11 + s8  + a11 
+r12 + r11 + s12 + s9  + a12 
+r13 + r12 + s13 + s10 + a13 
+                  
+
+

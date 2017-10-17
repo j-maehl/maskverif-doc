@@ -1,0 +1,72 @@
+#! /usr/bin/env python
+
+# --------------------------------------------------------------------
+import gevent.monkey; gevent.monkey.patch_all(sys = True)
+
+# --------------------------------------------------------------------
+import sys, os, tempfile, shutil, gevent, gevent.queue
+import gevent.subprocess as sp, contextlib
+
+# --------------------------------------------------------------------
+NTASKS = 16
+
+# --------------------------------------------------------------------
+@contextlib.contextmanager
+def TemporaryDirectory():
+    name = tempfile.mkdtemp()
+    try:
+        yield name
+    finally:
+        pass
+        #shutil.rmtree(name)
+
+# --------------------------------------------------------------------
+class Object(object):
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+# --------------------------------------------------------------------
+def linereader(stream):
+    while True:
+        line = stream.readline()
+        if not line: break
+        yield line
+
+# --------------------------------------------------------------------
+def check(id, data):
+    while True:
+        task = data.queue.get()
+        if task is StopIteration:
+            data.queue.put(StopIteration)
+            break
+
+        tid, task = task
+
+        print >>sys.stderr, 'TASK: %s' % (task,)
+        sp.call(['main.native'] + data.opts + task.split())
+
+# --------------------------------------------------------------------
+def feeder(data):
+    for i, line in enumerate(linereader(sys.stdin)):
+        data.queue.put((i, line.strip()))
+    data.queue.put(StopIteration)
+
+# --------------------------------------------------------------------
+def _main():
+    with TemporaryDirectory() as tmpdir:
+        tasks = []
+        data  = Object(
+            queue  = gevent.queue.Queue(),
+            tmpdir = tmpdir,
+            opts   = sys.argv[1:],
+        )
+            
+        for i in xrange(NTASKS):
+            tasks.append(gevent.spawn(check, i, data))
+        tasks.append(gevent.spawn(feeder, data))
+
+        gevent.joinall(tasks)
+
+# --------------------------------------------------------------------
+if __name__ == '__main__':
+    _main()

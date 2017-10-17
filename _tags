@@ -1,0 +1,8 @@
+# --------------------------------------------------------------------
+true : use_menhir, menhir_explain, menhir_table
+true : warn_Z, warn_Y
+true : -traverse
+
+# --------------------------------------------------------------------
+<src>   : include
+<src/*> : package(menhirLib), package(zarith)

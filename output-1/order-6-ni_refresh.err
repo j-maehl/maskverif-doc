@@ -1,0 +1,79 @@
+inlining done in 0.000
+(i1_20, i2_20, i3_20, i4_20, i5_20, i6_20, i7_20)
+(i1_30, i2_30, i3_30, i4_30, i5_30, i6_30, i7_30)
+(i1_40, i2_40, i3_40, i4_40, i5_40, i6_40, i7_40)
+(i1_50, i2_50, i3_50, i4_50, i5_50, i6_50, i7_50)
+(a11, a21, a31, a41, a51, a61, a71)
+after derandomize:
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+Context : Mult.refresh
+
+pre = true
+
+( 1)  a12 <$ Byte.distr                                                         
+( 2)  a22 <$ Byte.distr                                                         
+( 3)  a32 <$ Byte.distr                                                         
+( 4)  a42 <$ Byte.distr                                                         
+( 5)  a52 <$ Byte.distr                                                         
+( 6)  a62 <$ Byte.distr                                                         
+( 7)  r10 <$ Byte.distr                                                         
+( 8)  r20 <$ Byte.distr                                                         
+( 9)  r30 <$ Byte.distr                                                         
+(10)  r40 <$ Byte.distr                                                         
+(11)  r50 <$ Byte.distr                                                         
+(12)  r60 <$ Byte.distr                                                         
+(13)  r70 <$ Byte.distr                                                         
+(14)  a1 <- a12                                                                 
+(15)  a2 <- a22                                                                 
+(16)  a3 <- a32                                                                 
+(17)  a4 <- a42                                                                 
+(18)  a5 <- a52                                                                 
+(19)  a6 <- a62                                                                 
+(20)  a7 <- (a + a1 + a2 + a3 + a4 + a5 + a6)%Byte.ComRing                      
+(21)  a10 <- a1                                                                 
+(22)  a20 <- a2                                                                 
+(23)  a30 <- a3                                                                 
+(24)  a40 <- a4                                                                 
+(25)  a50 <- a5                                                                 
+(26)  a60 <- a6                                                                 
+(27)  a70 <- a7                                                                 
+(28)  r1 <- r10                                                                 
+(29)  r2 <- r20                                                                 
+(30)  r3 <- r30                                                                 
+(31)  r4 <- r40                                                                 
+(32)  r5 <- r50                                                                 
+(33)  r6 <- r60                                                                 
+(34)  r7 <- r70                                                                 
+(35)  (i1_2, i2_2, i3_2, i4_2, i5_2, i6_2, i7_2) <- (r1, r2, r3, r4, r5, r6, r7)
+(36)  (i1_20, i2_20, i3_20, i4_20, i5_20, i6_20, i7_20) <-                      
+(  )    (i1_2, i2_2, i3_2, i4_2, i5_2, i6_2, i7_2)                              
+(37)  (i1_3, i2_3, i3_3, i4_3, i5_3, i6_3, i7_3) <- (r7, r1, r2, r3, r4, r5, r6)
+(38)  (i1_30, i2_30, i3_30, i4_30, i5_30, i6_30, i7_30) <-                      
+(  )    (i1_3, i2_3, i3_3, i4_3, i5_3, i6_3, i7_3)                              
+(39)  (i1_4, i2_4, i3_4, i4_4, i5_4, i6_4, i7_4) <-                             
+(  )    ((a10 + i1_2)%Byte.ComRing, (a20 + i2_2)%Byte.ComRing,                  
+(  )     (a30 + i3_2)%Byte.ComRing, (a40 + i4_2)%Byte.ComRing,                  
+(  )     (a50 + i5_2)%Byte.ComRing, (a60 + i6_2)%Byte.ComRing,                  
+(  )     (a70 + i7_2)%Byte.ComRing)                                             
+(40)  (i1_40, i2_40, i3_40, i4_40, i5_40, i6_40, i7_40) <-                      
+(  )    (i1_4, i2_4, i3_4, i4_4, i5_4, i6_4, i7_4)                              
+(41)  (i1_5, i2_5, i3_5, i4_5, i5_5, i6_5, i7_5) <-                             
+(  )    ((i1_4 + i1_3)%Byte.ComRing, (i2_4 + i2_3)%Byte.ComRing,                
+(  )     (i3_4 + i3_3)%Byte.ComRing, (i4_4 + i4_3)%Byte.ComRing,                
+(  )     (i5_4 + i5_3)%Byte.ComRing, (i6_4 + i6_3)%Byte.ComRing,                
+(  )     (i7_4 + i7_3)%Byte.ComRing)                                            
+(42)  (i1_50, i2_50, i3_50, i4_50, i5_50, i6_50, i7_50) <-                      
+(  )    (i1_5, i2_5, i3_5, i4_5, i5_5, i6_5, i7_5)                              
+(43)  (a1, a2, a3, a4, a5, a6, a7) <- (i1_5, i2_5, i3_5, i4_5, i5_5, i6_5, i7_5)
+(44)  (a11, a21, a31, a41, a51, a61, a71) <- (a1, a2, a3, a4, a5, a6, a7)       
+
+post = true
+
+wp computed in 0.000
+and = Byte.ComRing.( * )   or = Byte.ComRing.(+)
+Checking done in 479.340000, 0 immediate error, 0 error
+TIME: 480.210

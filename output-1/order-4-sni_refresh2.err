@@ -1,0 +1,95 @@
+inlining done in 0.004
+(i1_21, i2_21, i3_21, i4_21, i5_21)
+(i1_31, i2_31, i3_31, i4_31, i5_31)
+(i1_41, i2_41, i3_41, i4_41, i5_41)
+(i1_51, i2_51, i3_51, i4_51, i5_51)
+(c10, c20, c30, c40, c50)
+(i1_200, i2_200, i3_200, i4_200, i5_200)
+(i1_300, i2_300, i3_300, i4_300, i5_300)
+(i1_400, i2_400, i3_400, i4_400, i5_400)
+(i1_500, i2_500, i3_500, i4_500, i5_500)
+(c11, c21, c31, c41, c51)
+after derandomize:
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+Context : Mult.refresh2_r
+
+pre = true
+
+( 1)  r11 <$ Byte.distr                                                              
+( 2)  r21 <$ Byte.distr                                                              
+( 3)  r31 <$ Byte.distr                                                              
+( 4)  r41 <$ Byte.distr                                                              
+( 5)  r51 <$ Byte.distr                                                              
+( 6)  r100 <$ Byte.distr                                                             
+( 7)  r200 <$ Byte.distr                                                             
+( 8)  r300 <$ Byte.distr                                                             
+( 9)  r400 <$ Byte.distr                                                             
+(10)  r500 <$ Byte.distr                                                             
+(11)  a10 <- a1                                                                      
+(12)  a20 <- a2                                                                      
+(13)  a30 <- a3                                                                      
+(14)  a40 <- a4                                                                      
+(15)  a50 <- a5                                                                      
+(16)  r1 <- r11                                                                      
+(17)  r2 <- r21                                                                      
+(18)  r3 <- r31                                                                      
+(19)  r4 <- r41                                                                      
+(20)  r5 <- r51                                                                      
+(21)  (i1_2, i2_2, i3_2, i4_2, i5_2) <- (r1, r2, r3, r4, r5)                         
+(22)  (i1_21, i2_21, i3_21, i4_21, i5_21) <- (i1_2, i2_2, i3_2, i4_2, i5_2)          
+(23)  (i1_3, i2_3, i3_3, i4_3, i5_3) <- (r5, r1, r2, r3, r4)                         
+(24)  (i1_31, i2_31, i3_31, i4_31, i5_31) <- (i1_3, i2_3, i3_3, i4_3, i5_3)          
+(25)  (i1_4, i2_4, i3_4, i4_4, i5_4) <-                                              
+(  )    ((a10 + i1_2)%Byte.ComRing, (a20 + i2_2)%Byte.ComRing,                       
+(  )     (a30 + i3_2)%Byte.ComRing, (a40 + i4_2)%Byte.ComRing,                       
+(  )     (a50 + i5_2)%Byte.ComRing)                                                  
+(26)  (i1_41, i2_41, i3_41, i4_41, i5_41) <- (i1_4, i2_4, i3_4, i4_4, i5_4)          
+(27)  (i1_5, i2_5, i3_5, i4_5, i5_5) <-                                              
+(  )    ((i1_4 + i1_3)%Byte.ComRing, (i2_4 + i2_3)%Byte.ComRing,                     
+(  )     (i3_4 + i3_3)%Byte.ComRing, (i4_4 + i4_3)%Byte.ComRing,                     
+(  )     (i5_4 + i5_3)%Byte.ComRing)                                                 
+(28)  (i1_51, i2_51, i3_51, i4_51, i5_51) <- (i1_5, i2_5, i3_5, i4_5, i5_5)          
+(29)  (c1, c2, c3, c4, c5) <- (i1_5, i2_5, i3_5, i4_5, i5_5)                         
+(30)  (c10, c20, c30, c40, c50) <- (c1, c2, c3, c4, c5)                              
+(31)  a11 <- c1                                                                      
+(32)  a21 <- c2                                                                      
+(33)  a31 <- c3                                                                      
+(34)  a41 <- c4                                                                      
+(35)  a51 <- c5                                                                      
+(36)  r10 <- r100                                                                    
+(37)  r20 <- r200                                                                    
+(38)  r30 <- r300                                                                    
+(39)  r40 <- r400                                                                    
+(40)  r50 <- r500                                                                    
+(41)  (i1_20, i2_20, i3_20, i4_20, i5_20) <- (r10, r20, r30, r40, r50)               
+(42)  (i1_200, i2_200, i3_200, i4_200, i5_200) <- (i1_20, i2_20, i3_20, i4_20, i5_20)
+(43)  (i1_30, i2_30, i3_30, i4_30, i5_30) <- (r50, r10, r20, r30, r40)               
+(44)  (i1_300, i2_300, i3_300, i4_300, i5_300) <- (i1_30, i2_30, i3_30, i4_30, i5_30)
+(45)  (i1_40, i2_40, i3_40, i4_40, i5_40) <-                                         
+(  )    ((a11 + i1_20)%Byte.ComRing, (a21 + i2_20)%Byte.ComRing,                     
+(  )     (a31 + i3_20)%Byte.ComRing, (a41 + i4_20)%Byte.ComRing,                     
+(  )     (a51 + i5_20)%Byte.ComRing)                                                 
+(46)  (i1_400, i2_400, i3_400, i4_400, i5_400) <- (i1_40, i2_40, i3_40, i4_40, i5_40)
+(47)  (i1_50, i2_50, i3_50, i4_50, i5_50) <-                                         
+(  )    ((i1_40 + i1_30)%Byte.ComRing, (i2_40 + i2_30)%Byte.ComRing,                 
+(  )     (i3_40 + i3_30)%Byte.ComRing, (i4_40 + i4_30)%Byte.ComRing,                 
+(  )     (i5_40 + i5_30)%Byte.ComRing)                                               
+(48)  (i1_500, i2_500, i3_500, i4_500, i5_500) <- (i1_50, i2_50, i3_50, i4_50, i5_50)
+(49)  (c1, c2, c3, c4, c5) <- (i1_50, i2_50, i3_50, i4_50, i5_50)                    
+(50)  (c11, c21, c31, c41, c51) <- (c1, c2, c3, c4, c5)                              
+
+post = true
+
+length f_args = 5
+wp computed in 0.000
+Start i = 4
+Start output = 3, internal = 1 
+Start output = 2, internal = 2 
+Start output = 1, internal = 3 
+Start output = 0, internal = 4 
+SNI
+TIME: 0.840

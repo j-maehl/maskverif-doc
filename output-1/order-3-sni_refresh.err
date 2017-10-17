@@ -1,0 +1,46 @@
+inlining done in 0.000
+(i1_20, i2_20, i3_20, i4_20)
+(i1_30, i2_30, i3_30, i4_30)
+(i1_40, i2_40, i3_40, i4_40)
+(i1_50, i2_50, i3_50, i4_50)
+after derandomize:
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+Context : Mult.refresh_r
+
+pre = true
+
+( 1)  r10 <$ Byte.distr                                         
+( 2)  r20 <$ Byte.distr                                         
+( 3)  r30 <$ Byte.distr                                         
+( 4)  r40 <$ Byte.distr                                         
+( 5)  r1 <- r10                                                 
+( 6)  r2 <- r20                                                 
+( 7)  r3 <- r30                                                 
+( 8)  r4 <- r40                                                 
+( 9)  (i1_2, i2_2, i3_2, i4_2) <- (r1, r2, r3, r4)              
+(10)  (i1_20, i2_20, i3_20, i4_20) <- (i1_2, i2_2, i3_2, i4_2)  
+(11)  (i1_3, i2_3, i3_3, i4_3) <- (r4, r1, r2, r3)              
+(12)  (i1_30, i2_30, i3_30, i4_30) <- (i1_3, i2_3, i3_3, i4_3)  
+(13)  (i1_4, i2_4, i3_4, i4_4) <-                               
+(  )    ((a1 + i1_2)%Byte.ComRing, (a2 + i2_2)%Byte.ComRing,    
+(  )     (a3 + i3_2)%Byte.ComRing, (a4 + i4_2)%Byte.ComRing)    
+(14)  (i1_40, i2_40, i3_40, i4_40) <- (i1_4, i2_4, i3_4, i4_4)  
+(15)  (i1_5, i2_5, i3_5, i4_5) <-                               
+(  )    ((i1_4 + i1_3)%Byte.ComRing, (i2_4 + i2_3)%Byte.ComRing,
+(  )     (i3_4 + i3_3)%Byte.ComRing, (i4_4 + i4_3)%Byte.ComRing)
+(16)  (i1_50, i2_50, i3_50, i4_50) <- (i1_5, i2_5, i3_5, i4_5)  
+
+post = true
+
+length f_args = 4
+wp computed in 0.000
+Start i = 3
+Start output = 2, internal = 1 
+Start output = 1, internal = 2 
+Start output = 0, internal = 3 
+SNI
+TIME: 0.844

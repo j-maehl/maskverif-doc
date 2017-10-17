@@ -1,0 +1,54 @@
+inlining done in 0.000
+(i1_10, i2_10, i3_10)
+(i1_20, i2_20, i3_20)
+(i1_30, i2_30, i3_30)
+(i1_40, i2_40, i3_40)
+(i1_50, i2_50, i3_50)
+(b10, b20, b30)
+after derandomize:
+Current goal
+
+Type variables: <none>
+
+------------------------------------------------------------------------
+Context : Mult.refresh
+
+pre = true
+
+( 1)  a11 <$ Byte.distr                                         
+( 2)  a21 <$ Byte.distr                                         
+( 3)  r10 <$ Byte.distr                                         
+( 4)  r20 <$ Byte.distr                                         
+( 5)  r30 <$ Byte.distr                                         
+( 6)  a1 <- a11                                                 
+( 7)  a2 <- a21                                                 
+( 8)  a3 <- (a + a1 + a2)%Byte.ComRing                          
+( 9)  a10 <- a1                                                 
+(10)  a20 <- a2                                                 
+(11)  a30 <- a3                                                 
+(12)  r1 <- r10                                                 
+(13)  r2 <- r20                                                 
+(14)  r3 <- r30                                                 
+(15)  (i1_1, i2_1, i3_1) <- (a10, a20, a30)                     
+(16)  (i1_10, i2_10, i3_10) <- (i1_1, i2_1, i3_1)               
+(17)  (i1_2, i2_2, i3_2) <- (r1, r2, r3)                        
+(18)  (i1_20, i2_20, i3_20) <- (i1_2, i2_2, i3_2)               
+(19)  (i1_3, i2_3, i3_3) <- (r3, r1, r2)                        
+(20)  (i1_30, i2_30, i3_30) <- (i1_3, i2_3, i3_3)               
+(21)  (i1_4, i2_4, i3_4) <-                                     
+(  )    ((i1_1 + i1_2)%Byte.ComRing, (i2_1 + i2_2)%Byte.ComRing,
+(  )     (i3_1 + i3_2)%Byte.ComRing)                            
+(22)  (i1_40, i2_40, i3_40) <- (i1_4, i2_4, i3_4)               
+(23)  (i1_5, i2_5, i3_5) <-                                     
+(  )    ((i1_4 + i1_3)%Byte.ComRing, (i2_4 + i2_3)%Byte.ComRing,
+(  )     (i3_4 + i3_3)%Byte.ComRing)                            
+(24)  (i1_50, i2_50, i3_50) <- (i1_5, i2_5, i3_5)               
+(25)  (b1, b2, b3) <- (i1_5, i2_5, i3_5)                        
+(26)  (b10, b20, b30) <- (b1, b2, b3)                           
+
+post = true
+
+wp computed in 0.000
+and = Byte.ComRing.( * )   or = Byte.ComRing.(+)
+Checking done in 0.000000, 0 immediate error, 0 error
+TIME: 0.821
