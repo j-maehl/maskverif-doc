@@ -129,29 +129,6 @@ let check_all state maxparams (ldfs:ldfs) =
    in
   check_all state maxparams (ldfs:ldfs);
   Format.eprintf "%a tuples checked@." pp_z !tdone
-          
-
-let check_sni params nb_shares interns outs =
-  try 
-    let len_i = List.length interns in
-    let len_o = List.length outs in
-    let state = init_state nb_shares params in
-    let order = nb_shares - 1 in 
-    let interns = List.map (fun e -> e, e) interns in
-    let outs = List.map (fun e -> e, e) outs in 
-    for ki = 0 to (*nb_shares - 1*) (nb_shares-1)/2 (* FIXME *) do
-      let ko = order - ki in
-      Format.eprintf "Start checking of ki = %i, ko = %i@." ki ko;
-      (if ki <= len_i && ko <= len_o then
-         let args = if ko = 0 then [] else [ko, outs, len_o] in
-         let args = if ki = 0 then args else (ki,interns,len_i) :: args in
-         check_all state ki args);
-      Format.eprintf "Checking of done ki = %i, ko = %i@." ki ko;
-    done;
-    Format.printf "SNI@."
-  with CanNotCheck le ->
-    Format.eprintf "%a@." print_error le
-
 
 let check_ni params nb_shares interns outs =
   try 
@@ -165,6 +142,29 @@ let check_ni params nb_shares interns outs =
     Format.printf "NI@."
   with CanNotCheck le ->
     Format.eprintf "%a@." print_error le
+
+let check_fni f params nb_shares interns outs =
+  try 
+    let len_i = List.length interns in
+    let len_o = List.length outs in
+    let state = init_state nb_shares params in
+    let order = nb_shares - 1 in 
+    let interns = List.map (fun e -> e, e) interns in
+    let outs = List.map (fun e -> e, e) outs in 
+    for ki = 0 to (*nb_shares - 1*) (nb_shares-1)/2 (* FIXME *) do
+      let ko = order - ki in
+      Format.eprintf "Start checking of ki = %i, ko = %i@." ki ko;
+      (if ki <= len_i && ko <= len_o then
+         let args = if ko = 0 then [] else [ko, outs, len_o] in
+         let args = if ki = 0 then args else (ki,interns,len_i) :: args in
+         check_all state (f ki ko) args);
+      Format.eprintf "Checking of done ki = %i, ko = %i@." ki ko;
+    done;
+    Format.printf "SNI@."
+  with CanNotCheck le ->
+    Format.eprintf "%a@." print_error le
+
+let check_sni = check_fni (fun ki _ko -> ki)
 
 let mk_interns outs = 
   let souts = Se.of_list outs in
