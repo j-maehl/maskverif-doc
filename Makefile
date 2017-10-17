@@ -1,18 +1,15 @@
-#
-# Pure OCaml, no packages, no _tags 
-#
+# --------------------------------------------------------------------
+OCB_FLAGS :=
+OCB       := ocamlbuild -use-ocamlfind $(OCB_FLAGS)
+MAIN      := main
 
-# bin-annot is required for Merlin and other IDE-like tools
+# --------------------------------------------------------------------
+.PHONY: all clean byte native profile debug test
 
-OCB_FLAGS = 
-OCB = 		ocamlbuild  -use-ocamlfind $(OCB_FLAGS)
-MAIN = main
-
-all:    native 
+all: native 
 
 clean:
-	$(OCB) -clean
-	rm src/*~
+	$(OCB) -clean; rm -f src/*~
 
 native: 
 	$(OCB) $(MAIN).native
@@ -26,10 +23,8 @@ profile:
 debug:
 	$(OCB) -tag debug $(MAIN).byte
 
-test: 	native
+test:	native
 	./$(MAIN).native 
-
-.PHONY: all clean byte native profile debug test
 
 %.inferred.mli:
 	@$(OCB) src/$@ && cat _build/src/$@

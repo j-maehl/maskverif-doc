@@ -1,8 +1,6 @@
 S src
-
 B _build/src
 
-PKG batteries
 PKG menhirLib
 PKG zarith
 

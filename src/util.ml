@@ -1,3 +1,4 @@
+(* ----------------------------------------------------------------------- *)
 module List = struct
   include List
 
@@ -15,15 +16,12 @@ module List = struct
 end
 
 (* ----------------------------------------------------------------------- *)
-
 let rec pp_list sep pp fmt xs =
   let pp_list = pp_list sep pp in
   match xs with
   | []      -> ()
   | [x]     -> Format.fprintf fmt "%a" pp x
   | x :: xs -> Format.fprintf fmt "%a%(%)%a" pp x sep pp_list xs
-
-
 
 let rec partition f lin lout l = 
   match l with
@@ -41,14 +39,12 @@ end
 module Mint = Map.Make(OrderedInt)
 
 (* ----------------------------------------------------------------------- *)
-
 module OrderedStr = struct
   type t = string
   let compare x y = compare x y
 end
 
 module Mstr = Map.Make(OrderedStr)
-
 
 (* ----------------------------------------------------------------------- *)
 module Array = struct
@@ -57,7 +53,6 @@ module Array = struct
   let for_all f t = 
     let rec aux i = f t.(i) && (i = 0 || aux (i-1)) in
     aux (length t - 1)
-
 end 
 
 let finally final f a =
@@ -102,10 +97,9 @@ module Stack = struct
 
   let iter f s = 
     for i = 0 to s.st_top - 1 do f s.st_buff.(i) done
-
 end 
 
-
+(* -------------------------------------------------------------------- *)
 module Vector = struct
 
   type 'a t = {
