@@ -5,4 +5,4 @@ true : -traverse
 
 # --------------------------------------------------------------------
 <src>   : include
-<src/*> : package(menhirLib), package(zarith)
+<src/*> : package(zarith)
