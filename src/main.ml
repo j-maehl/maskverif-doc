@@ -143,7 +143,7 @@ let check_ni params nb_shares interns outs =
   with CanNotCheck le ->
     Format.eprintf "%a@." print_error le
 
-let check_fni f params nb_shares interns outs =
+let check_fni s f params nb_shares interns outs =
   try 
     let len_i = List.length interns in
     let len_o = List.length outs in
@@ -160,11 +160,12 @@ let check_fni f params nb_shares interns outs =
          check_all state (f ki ko) args);
       Format.eprintf "Checking of done ki = %i, ko = %i@." ki ko;
     done;
-    Format.printf "FNI@."
+    Format.printf "%s@." s
   with CanNotCheck le ->
     Format.eprintf "%a@." print_error le
 
-let check_sni = check_fni (fun ki _ko -> ki)
+let check_sni = check_fni "SNI" (fun ki _ko -> ki)
+let check_fni = check_fni "FNI" 
 
 let mk_interns outs = 
   let souts = Se.of_list outs in
@@ -251,6 +252,11 @@ let doit2 n k =
   Array.iter (fun e -> Format.printf "%a@." pp_expr e) refresh;
   main_sni [a] n (List.tl (Array.to_list refresh))
 
+let doit3 n k1 k2  = 
+  let refresh = refresh n "r" 1 ["s", k1; "t", k2] in
+  Array.iter (fun e -> Format.printf "%a@." pp_expr e) refresh;
+  main_sni [a] n (List.tl (Array.to_list refresh))
+
 (* Ok in 0.002 s *)
 (*let _ = doit1 3 1 *)
 
@@ -271,6 +277,18 @@ let doit2 n k =
 
 (* Ok in 0.022 s *)
 (* let _ = doit2 7 2 *)
+
+(* Ok in 0m0.039 s *)
+(* let _ = doit2 8 1 *)
+
+(* Ok in 0m0.494 s *)
+(*let _ = doit2 9 1 *)
+
+(* Marche pas *)
+(* let _ = doit2 10 1 *)
+
+(* Ok in 0m2.781 s *) 
+let _ = doit3 10 1 1
 
 (* Ok in 0.059 s *)
 (* let _ = doit2 8 2 *)
@@ -326,7 +344,7 @@ $r13
 (* Ok in 31m34.685s *)
 (*let _ = doit2 14 3*)
 
-let _ = doit1_fni 5 1
+(*let _ = doit1_fni 5 1 *)
 
 (* Ok *)
 (* let _ = doit2 15 3 *)
@@ -410,3 +428,37 @@ let _ =
   Array.iter (fun e -> Format.printf "%a@." pp_expr e) mul9;
   main_ni [a;b] 9 (List.tl (Array.to_list mul9))
  *)
+
+let mul10 = 
+  let n = 10 in
+  let a = vshare a n   in
+  let b = vshare b n   in
+  
+  let c = vmul a b   in
+
+  let r = vrand "r" n in
+
+  let c = vadd c r in
+  let c = vadd (vadd c (vmul a (vshift b 1))) (vmul (vshift a 1) b) in
+
+  let c = vadd c (vshift r 1) in
+  let c = vadd (vadd c (vmul a (vshift b 2))) (vmul (vshift a 2) b) in
+
+  let r = vrand "s" n in
+  let c = vadd c r in
+  let c = vadd (vadd c (vmul a (vshift b 3))) (vmul (vshift a 3) b) in
+
+  let c = vadd c (vshift r 1) in
+  let c = vadd (vadd c (vmul a (vshift b 4))) (vmul (vshift a 4) b) in
+
+  let r = vrand "t" n in
+  let c = vadd c r in
+  let c = vadd c (vmul a (vshift b 5)) in
+  let c = vadd c (vshift r 1) in 
+  c
+
+let _ = 
+  Array.iter (fun e -> Format.printf "%a@." pp_expr e) mul10;
+  main_ni [a;b] 10 (List.tl (Array.to_list mul10))
+  
+
