@@ -288,7 +288,7 @@ let doit3 n k1 k2  =
 (* let _ = doit2 10 1 *)
 
 (* Ok in 0m2.781 s *) 
-let _ = doit3 10 1 1
+(* let _ = doit3 10 1 1 *)
 
 (* Ok in 0.059 s *)
 (* let _ = doit2 8 2 *)
@@ -457,8 +457,11 @@ let mul10 =
   let c = vadd c (vshift r 1) in 
   c
 
-let _ = 
+(*let _ = 
   Array.iter (fun e -> Format.printf "%a@." pp_expr e) mul10;
-  main_ni [a;b] 10 (List.tl (Array.to_list mul10))
+  main_ni [a;b] 10 (List.tl (Array.to_list mul10)) *)
+
+
+
   
 
