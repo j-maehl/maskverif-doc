@@ -217,8 +217,8 @@ let vshift v k =
    Array.init n (fun i -> v.((i + n - k) mod n)) 
 
 let vshare a n = Array.init n (share a) 
-  
-let refresh n r k l = 
+
+let refresh_a a n r k l = 
   let r = vrand r n in
   let rk = vshift r k in
   let c = vadd r rk in
@@ -230,8 +230,11 @@ let refresh n r k l =
       let c = vadd (vadd c r) rk in
       aux c l
     | [] -> 
-      vadd c (vshare a n) in
+      vadd c a in
   aux c l
+  
+let refresh n r k l = 
+  refresh_a (vshare a n) n r k l
 
 let refresh2 n k = refresh n "r" 1 ["s", k] 
 
@@ -429,10 +432,8 @@ let _ =
   main_ni [a;b] 9 (List.tl (Array.to_list mul9))
  *)
 
-let mul10 = 
+let mk_mul10 a b = 
   let n = 10 in
-  let a = vshare a n   in
-  let b = vshare b n   in
   
   let c = vmul a b   in
 
@@ -457,9 +458,22 @@ let mul10 =
   let c = vadd c (vshift r 1) in 
   c
 
-(*let _ = 
-  Array.iter (fun e -> Format.printf "%a@." pp_expr e) mul10;
-  main_ni [a;b] 10 (List.tl (Array.to_list mul10)) *)
+let mul10 = 
+  let n = 10 in
+  let a = vshare a n   in
+  let b = vshare b n   in
+  mk_mul10 a b 
+
+let square10 = 
+  let n = 10 in
+  let a = vshare a n   in
+  let a1 = refresh_a a n "u" 1 [] in
+  let a2 = refresh_a a n "v" 2 [] in
+  mk_mul10 a1 a2
+  
+let _ = 
+  Array.iter (fun e -> Format.printf "%a@." pp_expr e) square10;
+  main_ni [a;b] 10 (List.tl (Array.to_list square10)) 
 
 
 
