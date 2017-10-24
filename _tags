@@ -5,4 +5,7 @@ true : -traverse
 
 # --------------------------------------------------------------------
 <src>   : include
-<src/*> : package(zarith)
+<src/*> : package(zarith,unix)
+
+<src/main.byte>   : linkdep(src/shrcnt_low.o), custom
+<src/main.native> : linkdep(src/shrcnt_low.o)

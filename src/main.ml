@@ -2,6 +2,8 @@ open Util
 open Expr 
 open State
 
+module C = Shrcnt
+
 type ldfs = (int * (expr * expr) list * int) list
 
 let lfirst ldfs = 
@@ -471,11 +473,21 @@ let square10 =
   let a2 = refresh_a a n "v" 2 [] in
   mk_mul10 a1 a2
   
+
+(*
 let _ = 
   Array.iter (fun e -> Format.printf "%a@." pp_expr e) square10;
   main_ni [a;b] 10 (List.tl (Array.to_list square10)) 
+ *)
 
+let () =
+  let cnt = Shrcnt.create "/nu/strub/counter" in
 
+  for i = 0 to 1 do
+    if Unix.fork () = 0 then
+      while true do
+        Printf.printf "%ld\n%!" (Shrcnt.update cnt 1l)
+      done
+  done;
 
-  
-
+  while true do Unix.pause () done

@@ -37,5 +37,8 @@ let _ = dispatch begin function
        flag ["ocaml"; "pkg_threads"; "compile"] (S[A "-thread"]);
        flag ["ocaml"; "pkg_threads"; "link"] (S[A "-thread"]);
 
+       (* C code *)
+       pdep ["link"] "linkdep" (fun param -> [param])
+
    | _ -> ()
 end
