@@ -32,7 +32,7 @@
 
 /* -------------------------------------------------------------------- */
 typedef struct cnt {
-    uint32_t cn_value;
+    uint64_t cn_value;
 } cnt_t;
 
 struct shrcnt {
@@ -43,7 +43,7 @@ struct shrcnt {
     char  *sc_nm;
 };
 
-typedef uint32_t sfc_t;
+typedef uint64_t sfc_t;
 
 #define SFC_CREATE ((sfc_t) 0x0001)
 #define SFC_UNLINK ((sfc_t) 0x0002)
@@ -118,7 +118,7 @@ bailout:
 }
 
 /* -------------------------------------------------------------------- */
-static int shrcnt_modify(struct shrcnt *the, int32_t offset, uint32_t *value) {
+static int shrcnt_modify(struct shrcnt *the, int64_t offset, uint64_t *value) {
     if (sem_wait(the->sc_sem) < 0)
         return -1;
     the->sc_mem->cn_value += offset;
@@ -130,7 +130,7 @@ static int shrcnt_modify(struct shrcnt *the, int32_t offset, uint32_t *value) {
 }
 
 /* -------------------------------------------------------------------- */
-static int shrcnt_get(struct shrcnt *the, uint32_t *out) {
+static int shrcnt_get(struct shrcnt *the, uint64_t *out) {
     if (sem_wait(the->sc_sem) < 0)
         return -1;
     *out = the->sc_mem->cn_value;
@@ -164,7 +164,7 @@ static CAMLprim void caml_shrcnt_failure(void) {
 /* -------------------------------------------------------------------- */
 static CAMLprim void caml_shrcnt_finalize(value the) {
     CAMLparam1(the);
-    
+
     if (Counter_val(the) != NULL)
         shrcnt_destroy(Counter_val(the));
     CAMLreturn0;
@@ -210,24 +210,34 @@ CAMLprim value caml_shrcnt_id(value the) {
 /* -------------------------------------------------------------------- */
 CAMLprim value caml_shrcnt_get(value the) {
     CAMLparam1(the);
-    uint32_t cnt;
+    uint64_t cnt;
 
     if (Counter_val(the) == NULL)
         caml_shrcnt_failure();
     if (shrcnt_get(Counter_val(the), &cnt) < 0)
         caml_shrcnt_failure();
-    CAMLreturn (caml_copy_int32(cnt));
+    CAMLreturn (caml_copy_int64(cnt));
 }
 
 /* -------------------------------------------------------------------- */
 CAMLprim value caml_shrcnt_update(value the, value offset) {
     CAMLparam2(the, offset);
-    uint32_t cnt;
+    uint64_t cnt;
 
     if (Counter_val(the) == NULL)
         caml_shrcnt_failure();
-    if (shrcnt_modify(Counter_val(the), Int32_val(offset), &cnt) < 0)
+    if (shrcnt_modify(Counter_val(the), Int64_val(offset), &cnt) < 0)
         caml_shrcnt_failure();
-    CAMLreturn(caml_copy_int32(cnt));
+    CAMLreturn(caml_copy_int64(cnt));
 }
 
+/* -------------------------------------------------------------------- */
+CAMLprim value caml_shrcnt_set_unlink(value the, value b) {
+  CAMLparam2(the, b);
+
+  if (b)
+    Counter_val(the)->sc_flags |=  SFC_UNLINK;
+  else
+    Counter_val(the)->sc_flags &= ~SFC_UNLINK;
+  CAMLreturn(Val_unit);
+}

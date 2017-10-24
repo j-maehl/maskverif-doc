@@ -5,4 +5,5 @@ PKG zarith
 PKG unix
 
 FLG -rectypes
+FLG -thread
 FLG -w Y -w Z -w -23 -w +28 -w +33

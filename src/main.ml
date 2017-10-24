@@ -93,6 +93,26 @@ let pp_z fmt z =
     if i <> k-1 then Format.fprintf fmt "," 
   done
 
+let pp_human suffix fmt num =
+  let sfx = [| ""; "K"; "M"; "G"; "T"; "P"; "E"; "Z"; "Y" |] in
+  let idx = ref 0 in
+  let num = ref num in
+  let fcr = ref None in
+
+  while !idx < (Array.length sfx - 1) && Z.gt !num (Z.of_int 1000) do
+    fcr := Some (Z.rem !num (Z.of_int 1000));
+    num := Z.div !num (Z.of_int 1000);
+    idx := !idx + 1
+  done;
+  let suffix = sfx.(!idx) ^ suffix in
+
+  match !fcr with
+  | None ->
+      Format.fprintf fmt "%s %s" (Z.to_string !num) suffix
+  | Some fcr ->
+      Format.fprintf fmt "%s.%0.3d %s"
+        (Z.to_string !num) (Z.to_int fcr) suffix
+      
   
 let check_all state maxparams (ldfs:ldfs) = 
   let to_check = cnp_accu ldfs in
@@ -132,6 +152,119 @@ let check_all state maxparams (ldfs:ldfs) =
   check_all state maxparams (ldfs:ldfs);
   Format.eprintf "%a tuples checked@." pp_z !tdone
 
+exception Done
+
+let check_all_para state maxparams (ldfs:ldfs) = 
+  let pipe   = Unix.pipe () in
+  let tdone  = Shrcnt.create "/masking/para/tdone" in
+  let tprcs  = Shrcnt.create "/masking/para/tprcs" in
+  let t0     = Sys.time () in
+  let parent = ref true in
+  let pp     = pp_human "tuples" in
+
+  let cleanup () =
+    if !parent then begin
+      (try Shrcnt.dispose tdone with _ -> ());
+      (try Shrcnt.dispose tprcs with _ -> ())
+    end
+  in
+
+  try
+    let to_check = cnp_accu ldfs in
+
+    Format.eprintf "%a to check@." pp to_check;
+
+    if Unix.fork () = 0 then begin
+      let count = ref 0 in
+
+      Shrcnt.clr_unlink_on_dispose tdone;
+      Shrcnt.clr_unlink_on_dispose tprcs;
+      parent := false; Unix.close (fst pipe);
+      Shrcnt.update tprcs 1L;
+
+      let rec check_all state maxparams (ldfs:ldfs) = 
+        let goup, stend = ref false, ref false in
+
+          if (incr count; !count) > 256 then begin
+          count := 0; if Shrcnt.get tprcs < 16L then begin
+            if Unix.fork () = 0 then begin
+              Shrcnt.update tprcs 1L; stend := true
+            end else begin
+              goup := true
+            end
+          end
+        end;
+
+        begin if not !goup then begin
+          let continue, ldfs = simplify_ldfs state maxparams ldfs in
+  
+          if continue then 
+            let split = find_bij state maxparams ldfs in
+            let rec aux accu split ldfs = 
+              match split, ldfs with
+              | [], [] ->
+                  Shrcnt.update tdone (Z.to_int64 (cnp_accu accu))
+  
+              | (s1, s2) :: split, (d,_,len) :: ldfs ->
+                  let len1 = List.length s1 in
+                  let len2 = len - len1 in
+                  aux ((d,s1,len1)::accu) split ldfs;
+                  let ldfs = List.rev_append accu ldfs in
+                  if d <= len2 then 
+                    check_all state maxparams ((d,s2,len2)::ldfs);
+                  for i1 = 1 to d - 1 do
+                    let i2 = d - i1 in
+                    if i1 <= len1 && i2 <= len2 then
+                      check_all state maxparams ((i1,s1,len1)::(i2,s2,len2)::ldfs)
+                  done
+  
+              | _ -> assert false
+  
+            in aux [] split ldfs
+          end
+
+        else 
+          Shrcnt.update tdone (Z.to_int64 (cnp_accu ldfs)) end;
+
+        if !stend then raise Done in
+
+       try
+         check_all state maxparams (ldfs:ldfs); raise Done
+       with
+       | CanNotCheck le -> begin
+           Format.eprintf "%a@." print_error le;
+           Shrcnt.update tprcs (-1L);
+           ignore (Unix.write (snd pipe) "." 0 1 : int);
+           exit 1
+         end
+
+       | Done -> begin
+           Shrcnt.update tprcs (-1L);
+           exit 0
+         end
+      
+    end else begin
+      Unix.close (snd pipe);
+      let rec wait () =
+        let rds, _, _ = Unix.select [fst pipe] [] [] 5.0 in
+        if List.is_empty rds then begin
+          Format.eprintf
+            "%a checked over %a in %.3f@."
+            pp (Z.of_int64 (Shrcnt.get tdone))
+            pp to_check (Sys.time () -. t0);
+          wait ()
+        end else begin
+          Unix.read (fst pipe) (Bytes.make 1 '.') 0 1 = 0
+        end
+      in
+
+      if not (wait ()) then exit 1;
+      Format.eprintf "%a checked@." pp (Z.of_int64 (Shrcnt.get tdone));
+      if Shrcnt.get tprcs <> 0L then assert false
+    end; cleanup ()
+
+  with e -> (cleanup (); raise e)
+
 let check_ni params nb_shares interns outs =
   try 
     let all = interns @ outs in
@@ -145,7 +278,7 @@ let check_ni params nb_shares interns outs =
   with CanNotCheck le ->
     Format.eprintf "%a@." print_error le
 
-let check_fni s f params nb_shares interns outs =
+let check_fni ?(para = false) s f params nb_shares interns outs =
   try 
     let len_i = List.length interns in
     let len_o = List.length outs in
@@ -159,15 +292,15 @@ let check_fni s f params nb_shares interns outs =
       (if ki <= len_i && ko <= len_o then
          let args = if ko = 0 then [] else [ko, outs, len_o] in
          let args = if ki = 0 then args else (ki,interns,len_i) :: args in
-         check_all state (f ki ko) args);
+         (if para then check_all_para else check_all) state (f ki ko) args);
       Format.eprintf "Checking of done ki = %i, ko = %i@." ki ko;
     done;
     Format.printf "%s@." s
   with CanNotCheck le ->
     Format.eprintf "%a@." print_error le
 
-let check_sni = check_fni "SNI" (fun ki _ko -> ki)
-let check_fni = check_fni "FNI" 
+let check_sni ?para = check_fni ?para "SNI" (fun ki _ko -> ki)
+let check_fni ?para = check_fni ?para "FNI" 
 
 let mk_interns outs = 
   let souts = Se.of_list outs in
@@ -183,7 +316,7 @@ let mk_interns outs =
   Se.elements interns
 
 let main_sni params nb_shares outs = 
-  check_sni params nb_shares (mk_interns outs) outs
+  check_sni ~para:true params nb_shares (mk_interns outs) outs
 
 let main_ni params nb_shares outs = 
   check_ni params nb_shares (mk_interns outs) outs
@@ -263,7 +396,7 @@ let doit3 n k1 k2  =
   main_sni [a] n (List.tl (Array.to_list refresh))
 
 (* Ok in 0.002 s *)
-(*let _ = doit1 3 1 *)
+(* let _ = doit1 3 1 *)
 
 (* Ok in 0.002 s *)
 (*let _ = doit1 4 1 *)
@@ -287,7 +420,7 @@ let doit3 n k1 k2  =
 (* let _ = doit2 8 1 *)
 
 (* Ok in 0m0.494 s *)
-(*let _ = doit2 9 1 *)
+let _ = doit2 9 1
 
 (* Marche pas *)
 (* let _ = doit2 10 1 *)
@@ -480,6 +613,7 @@ let _ =
   main_ni [a;b] 10 (List.tl (Array.to_list square10)) 
  *)
 
+(*
 let () =
   let cnt = Shrcnt.create "/nu/strub/counter" in
 
@@ -491,3 +625,4 @@ let () =
   done;
 
   while true do Unix.pause () done
+ *)
