@@ -1,5 +1,5 @@
 # --------------------------------------------------------------------
-OCB_FLAGS :=
+OCB_FLAGS := -cflags -cclib,-lrt
 OCB       := ocamlbuild -use-ocamlfind $(OCB_FLAGS)
 MAIN      := main
 
