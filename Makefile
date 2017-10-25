@@ -1,12 +1,13 @@
 # --------------------------------------------------------------------
 OCB_FLAGS :=
-OCB       := ocamlbuild -use-ocamlfind $(OCB_FLAGS)
 MAIN      := main
 UNAME_S   := $(shell uname -s)
 
 ifeq ($(UNAME_S),Linux)
 OCB_FLAGS += -lflags -cclib,-lrt
 endif
+
+OCB := ocamlbuild -use-ocamlfind $(OCB_FLAGS)
 
 # --------------------------------------------------------------------
 .PHONY: all clean byte native profile debug test
