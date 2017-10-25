@@ -187,10 +187,16 @@ let check_all_para state maxparams (ldfs:ldfs) =
 
           if (incr count; !count) > 256 then begin
           count := 0; if Shrcnt.get tprcs < 16L then begin
-            if Unix.fork () = 0 then begin
-              Shrcnt.update tprcs 1L; stend := true
+            let pid = Unix.fork () in
+            if pid = 0 then begin
+              if Unix.fork () = 0 then
+                stend := true
+              else begin
+               Shrcnt.update tprcs 1L; exit 0
+              end
             end else begin
-              goup := true
+              goup := true;
+              ignore (Unix.waitpid [] pid : int * _)
             end
           end
         end;
