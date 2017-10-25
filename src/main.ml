@@ -182,6 +182,8 @@ let check_all_para state maxparams (ldfs:ldfs) =
       parent := false; Unix.close (fst pipe);
       Shrcnt.update tprcs 1L;
 
+      if Unix.fork () <> 0 then exit 0;
+
       let rec check_all state maxparams (ldfs:ldfs) = 
         let goup, stend = ref false, ref false in
 
