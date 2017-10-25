@@ -211,7 +211,8 @@ let check_all_para state maxparams (ldfs:L.ldfs) =
 
   try
     let to_check = L.cnp_ldfs ldfs in
-    let thld = Z.div to_check (Z.of_int 100) in
+    let thld = Z.div to_check (Z.of_int 300) in
+    let thld_h = Z.div to_check (Z.of_int 2) in
 
     Format.eprintf "%a to check@." pp to_check;
 
@@ -228,7 +229,7 @@ let check_all_para state maxparams (ldfs:L.ldfs) =
       let rec check_all state maxparams (ldfs:L.ldfs) = 
         let goup, stend = ref false, ref false in
 
-          if Z.gt (L.cnp_ldfs ldfs) thld then begin
+          if Z.gt (L.cnp_ldfs ldfs) thld && Z.lt (L.cnp_ldfs ldfs) thld_h then begin
             if Shrcnt.get tprcs < 16L then begin
             let pid = Unix.fork () in
             if pid = 0 then begin
@@ -494,10 +495,10 @@ let doit3 n k1 k2  =
 (* let _ = doit2 11 2 *)
 
 (* Ok in 49.044 s *)
-let _ = doit2 12 2
+(* let _ = doit2 12 2 *)
 
 (* Ok in 10m31.869 s *)
-(*let _ = doit2 13 2 *)
+let _ = doit2 13 2 
 
 (* 
   decalage de 2   
