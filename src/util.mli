@@ -11,7 +11,7 @@ val partition :
   ('a -> bool) -> 'a list -> 'a list -> 'a list -> 'a list * 'a list
 
 val pp_list :
-  ('a, 'b, 'c, 'd, 'd, 'a) CamlinternalFormatBasics.format6 ->
+  ('a, 'b, 'c, 'd, 'd, 'a) format6 ->
   (Format.formatter -> 'e -> unit) -> Format.formatter -> 'e list -> unit
 
 (* ----------------------------------------------------------------------- *)
