@@ -186,12 +186,12 @@ let check_all_para state maxparams (ldfs:ldfs) =
         let goup, stend = ref false, ref false in
 
           if (incr count; !count) > 256 then begin
-          count := 0; if Shrcnt.get tprcs < 16L then begin
+            count := 0; if Shrcnt.get tprcs < 16L then begin
             let pid = Unix.fork () in
             if pid = 0 then begin
-              if Unix.fork () = 0 then
+              if Unix.fork () = 0 then begin
                 stend := true
-              else begin
+              end else begin
                Shrcnt.update tprcs 1L; exit 0
               end
             end else begin
@@ -201,7 +201,7 @@ let check_all_para state maxparams (ldfs:ldfs) =
           end
         end;
 
-        begin if not !goup then begin
+        if not !goup then begin
           let continue, ldfs = simplify_ldfs state maxparams ldfs in
   
           if continue then 
@@ -227,10 +227,9 @@ let check_all_para state maxparams (ldfs:ldfs) =
               | _ -> assert false
   
             in aux [] split ldfs
-          end
-
-        else 
-          Shrcnt.update tdone (Z.to_int64 (cnp_accu ldfs)) end;
+          else 
+            Shrcnt.update tdone (Z.to_int64 (cnp_accu ldfs))
+        end;
 
         if !stend then raise Done in
 
