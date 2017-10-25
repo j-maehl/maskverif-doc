@@ -211,9 +211,7 @@ let check_all_para state maxparams (ldfs:L.ldfs) =
 
   try
     let to_check = L.cnp_ldfs ldfs in
-    let thld = Z.div to_check (Z.of_int 300) in
-    let thld_h = Z.div to_check (Z.of_int 2) in
-
+  
     Format.eprintf "%a to check@." pp to_check;
 
     let pid = Unix.fork () in
@@ -227,57 +225,59 @@ let check_all_para state maxparams (ldfs:L.ldfs) =
       if Unix.fork () <> 0 then exit 0;
 
       let rec check_all state maxparams (ldfs:L.ldfs) = 
-        let goup, stend = ref false, ref false in
+        let continue, ldfs = L.simplify_ldfs state maxparams ldfs in
+        if not continue then Shrcnt.update tdone (Z.to_int64 (L.cnp_ldfs ldfs))
+        else 
+          let nbdone = Shrcnt.get tdone in
+          let to_check = Z.sub to_check (Z.of_int64 nbdone) in
+          let thld = Z.div to_check (Z.of_int 100) in
+          let thld_h = Z.div to_check (Z.of_int 2) in
+
+          let goup, stend = ref false, ref false in
 
           if Z.gt (L.cnp_ldfs ldfs) thld && Z.lt (L.cnp_ldfs ldfs) thld_h then begin
-            if Shrcnt.get tprcs < 16L then begin
-            let pid = Unix.fork () in
-            if pid = 0 then begin
-              if Unix.fork () = 0 then begin
-                stend := true
-              end else begin
-               Shrcnt.update tprcs 1L; exit 0
-              end
-            end else begin
-              goup := true;
-              ignore (Unix.waitpid [] pid : int * _)
-            end
-          end
-        end;
+              if Shrcnt.get tprcs < 16L then begin
+                  let pid = Unix.fork () in
+                  if pid = 0 then begin
+                      if Unix.fork () = 0 then begin
+                          stend := true
+                        end else begin
+                          Shrcnt.update tprcs 1L; exit 0
+                        end
+                    end else begin
+                      goup := true;
+                      ignore (Unix.waitpid [] pid : int * _)
+                    end
+                end
+            end;
 
-        if not !goup then begin
-          let continue, ldfs = L.simplify_ldfs state maxparams ldfs in
-  
-          if continue then 
+          if not !goup then begin
             let split = find_bij state maxparams ldfs in
             let rec aux accu split ldfs = 
               match split, ldfs with
               | [], [] ->
-                  Shrcnt.update tdone (Z.to_int64 (L.cnp_ldfs accu))
-  
+                Shrcnt.update tdone (Z.to_int64 (L.cnp_ldfs accu))
+                              
               | (s1, s2) :: split, ldf  :: ldfs ->
-                  let d = ldf.L.n in 
-                  let len = ldf.L.p in 
-                  let len1 = List.length s1 in
-                  let len2 = len - len1 in
-                  aux (L.cons d s1 len1 accu) split ldfs;
-                  let ldfs = L.rev_append accu ldfs in
-                  if d <= len2 then 
-                    check_all state maxparams (L.cons d s2 len2 ldfs);
-                  for i1 = 1 to d - 1 do
-                    let i2 = d - i1 in
-                    if i1 <= len1 && i2 <= len2 then
-                      check_all state maxparams (L.cons i1 s1 len1 (L.cons i2 s2 len2 ldfs))
-                  done
-  
-              | _ -> assert false
-  
-            in aux [] split ldfs
-          else 
-            Shrcnt.update tdone (Z.to_int64 (L.cnp_ldfs ldfs))
-        end;
+                let d = ldf.L.n in 
+                let len = ldf.L.p in 
+                let len1 = List.length s1 in
+                let len2 = len - len1 in
+                aux (L.cons d s1 len1 accu) split ldfs;
+                let ldfs = L.rev_append accu ldfs in
+                if d <= len2 then 
+                  check_all state maxparams (L.cons d s2 len2 ldfs);
+                for i1 = 1 to d - 1 do
+                  let i2 = d - i1 in
+                  if i1 <= len1 && i2 <= len2 then
+                    check_all state maxparams (L.cons i1 s1 len1 (L.cons i2 s2 len2 ldfs))
+                done
+                  
+              | _ -> assert false in
+            aux [] split ldfs
+          end;
 
-        if !stend then raise Done in
+          if !stend then raise Done in
 
        try
          check_all state maxparams ldfs; raise Done
