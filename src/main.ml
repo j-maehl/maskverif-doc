@@ -78,14 +78,14 @@ let cnp_accu accu =
  
 let pp_z fmt z = 
   let s = Z.to_string z in
-  let len = String.length s in
+  let len = Bytes.length s in
   let s' = 
     let m = len mod 3 in
     if m = 0 then ""
-    else String.make (3 - m) '0' in
+    else Bytes.make (3 - m) '0' in
 
   let s = s' ^ s in
-  let k = String.length s / 3 in
+  let k = Bytes.length s / 3 in
   for i = 0 to k - 1 do
     for j = 0 to 2 do
       Format.fprintf fmt "%c" s.[i*3 + j]
@@ -156,8 +156,8 @@ exception Done
 
 let check_all_para state maxparams (ldfs:ldfs) = 
   let pipe   = Unix.pipe () in
-  let tdone  = Shrcnt.create "/masking/para/tdone" in
-  let tprcs  = Shrcnt.create "/masking/para/tprcs" in
+  let tdone  = Shrcnt.create "/masking.para.tdone" in
+  let tprcs  = Shrcnt.create "/masking.para.tprcs" in
   let t0     = Sys.time () in
   let parent = ref true in
   let pp     = pp_human "tuples" in
