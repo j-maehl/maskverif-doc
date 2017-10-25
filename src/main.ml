@@ -419,11 +419,11 @@ let refresh_a a n r k l =
       let c = vadd (vadd c r) rk in
       aux c l
     | [] -> 
-      vadd c a in
+      vadd c (Lazy.force a) in
   aux c l
   
 let refresh n r k l = 
-  refresh_a (vshare a n) n r k l
+  refresh_a (Lazy.from_fun (fun () -> vshare a n)) n r k l
 
 let refresh2 n k = refresh n "r" 1 ["s", k] 
 
@@ -656,8 +656,8 @@ let mul10 =
 let square10 = 
   let n = 10 in
   let a = vshare a n   in
-  let a1 = refresh_a a n "u" 1 [] in
-  let a2 = refresh_a a n "v" 2 [] in
+  let a1 = refresh_a (Lazy.from_val a) n "u" 1 [] in
+  let a2 = refresh_a (Lazy.from_val a) n "v" 2 [] in
   mk_mul10 a1 a2
   
 
