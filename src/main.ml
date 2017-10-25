@@ -4,42 +4,91 @@ open State
 
 module C = Shrcnt
 
-type ldfs = (int * (expr * expr) list * int) list
+let cnp n p =
+  let rec aux n p m d =
+    if n = 1 then Z.div (Z.mul (Z.of_int p) m) d
+    else aux (n-1) (p-1) (Z.mul (Z.of_int p) m) (Z.mul (Z.of_int n) d) in
+  if n = 0 then Z.one 
+  else aux n p Z.one Z.one
 
-let lfirst ldfs = 
-  let rec first n hd tl = 
-    if n = 0 then hd 
-    else match tl with
-    | x::tl -> first (n-1) (x::hd) tl
-    | []   -> assert false in
-  let rec aux hd ldfs = 
-    match ldfs with
-    | [] -> hd
-    | (d,fs,_)::ldfs -> aux (first d hd fs) ldfs in
-  aux [] ldfs
+module L : sig
 
-let set_top_ldfs state (ldfs:ldfs) = 
-  List.iter (fun (_, es, _) -> 
-      List.iter (fun (e,_) -> ignore (add_top_expr state e)) es) ldfs
+  type ldf = {
+      n : int;    (* number of elements to take in l *)
+      l : (expr * expr) list;
+      p : int;    (* size of l *)
+      cnp: Z.t;   (* cnp n p *)
+      c : Z.t;    (* total number of tuple to check *)
+    }
 
-let simplify_ldfs state maxparams ldfs = 
-  clear_state state;
-  set_top_ldfs state ldfs;
-  init_todo state;
-  let res = simplify_until state maxparams in
-  if res then (* Not need to do more work just return *)
-    false, ldfs
-  else 
-    let simple = simplified_expr state in
-    true, List.map (fun (d, es, len) -> 
-               (d, List.map (fun (e1, e2) -> simple e1, e2) es, len)) ldfs
+  type ldfs = ldf list
+
+  val cons : int -> (expr * expr) list -> int -> ldfs -> ldfs
+
+  val cnp_ldfs : ldfs -> Z.t
+  val lfirst : ldfs -> (expr * expr) list
+  val set_top_exprs : state -> (expr * expr) list -> unit
+  val set_top_exprs2 : state -> ldfs -> unit
+
+  val simplify_ldfs : state -> int -> ldfs -> bool * ldfs
+
+  val rev_append : ldfs -> ldfs -> ldfs
+
+end = struct
+  type ldf = {
+      n : int;    (* number of elements to take in l *)
+      l : (expr * expr) list;
+      p : int;    (* size of l *)
+      cnp: Z.t;   (* cnp n p *)
+      c : Z.t;    (* total number of tuple to check *)
+    }
+
+  type ldfs = ldf list
+
+  let cnp_ldfs = function
+    | []       -> Z.one
+    | ldf :: _ -> ldf.c
     
+  let cons n l p tl = 
+    let cnp = cnp n p in
+    { n; l; p; cnp; c = Z.mul cnp (cnp_ldfs tl)} ::  tl
 
-let set_top_exprs state es = 
-  List.iter (fun (e,_) -> ignore (add_top_expr state e)) es
+  let lfirst ldfs = 
+    let rec first n hd tl = 
+      if n = 0 then hd 
+      else match tl with
+           | x::tl -> first (n-1) (x::hd) tl
+           | []   -> assert false in
+    let rec aux hd ldfs = 
+      match ldfs with
+      | [] -> hd
+      | { n = d; l = fs} ::ldfs -> aux (first d hd fs) ldfs in
+    aux [] ldfs
 
-let set_top_exprs2 state ldfs = 
-  List.iter (fun (_,es,_) -> set_top_exprs state es) ldfs
+  let set_top_exprs state es = 
+    List.iter (fun (e,_) -> ignore (add_top_expr state e)) es
+
+  let set_top_exprs2 state ldfs = 
+    List.iter (fun ldf -> set_top_exprs state ldf.l) ldfs
+
+  let simplify_ldfs state maxparams ldfs = 
+    clear_state state;
+    set_top_exprs2 state ldfs;
+    init_todo state;
+    let res = simplify_until state maxparams in
+    if res then (* Not need to do more work just return *)
+      false, ldfs
+    else 
+      let simple = simplified_expr state in
+      true, List.map (fun ldf -> 
+                {ldf with l =  List.map (fun (e1, e2) -> simple e1, e2) ldf.l }) ldfs
+
+  let rec rev_append l1 l2 = 
+    match l1 with
+    | [] -> l2
+    | ldf::l1 -> rev_append l1 ({ ldf with c = Z.mul ldf.cnp (cnp_ldfs l2) }::l2)
+  
+end
 
 exception CanNotCheck of (expr * expr) list 
   
@@ -49,9 +98,9 @@ let print_error fmt lhd =
     (pp_list ",@ " (fun fmt (e1,_) -> pp_expr fmt e1)) lhd
 
 let find_bij state maxparams ldfs =
-  let lhd = lfirst ldfs in
+  let lhd = L.lfirst ldfs in
   clear_state state;
-  set_top_exprs state lhd;
+  L.set_top_exprs state lhd;
   init_todo state;
   if not (simplify_until state maxparams) then 
     let simple = simplified_expr state in
@@ -59,22 +108,11 @@ let find_bij state maxparams ldfs =
     raise (CanNotCheck lhd)
   else
     let used_share = used_share state in
-    set_top_exprs2 state ldfs;
+    L.set_top_exprs2 state ldfs;
     clear_bijection state;    
     simplify_until_with_clear state used_share maxparams;
     let is_in (e1, _) = is_top_expr state e1 in
-    List.map (fun (_,es,_) -> List.partition is_in es) ldfs
-
-
-let cnp n p =
-  let rec aux n p m d =
-    if n = 1 then Z.div (Z.mul (Z.of_int p) m) d
-    else aux (n-1) (p-1) (Z.mul (Z.of_int p) m) (Z.mul (Z.of_int n) d) in
-  if n = 0 then Z.one 
-  else aux n p Z.one Z.one
-
-let cnp_accu accu =
-  List.fold_left (fun r (n,_,p) -> Z.mul r (cnp n p)) Z.one accu
+    List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs
  
 let pp_z fmt z = 
   let s = Z.to_string z in
@@ -114,47 +152,49 @@ let pp_human suffix fmt num =
         (Z.to_string !num) (Z.to_int fcr) suffix
       
   
-let check_all state maxparams (ldfs:ldfs) = 
-  let to_check = cnp_accu ldfs in
+let check_all state maxparams (ldfs:L.ldfs) = 
+  let to_check = L.cnp_ldfs ldfs in
   Format.eprintf "%a tuples to check@." pp_z to_check;
   let tdone = ref Z.zero in
   let count = ref 0 in
   let t0 = Sys.time () in
-  let rec check_all state maxparams (ldfs:ldfs) = 
+  let rec check_all state maxparams (ldfs:L.ldfs) = 
     incr count;    
     if !count land 0x3FFFF = 0 then 
       Format.eprintf "%a tuples checked over %a in %.3f@."
         pp_z !tdone pp_z to_check (Sys.time () -. t0);
 
-    let continue, ldfs = simplify_ldfs state maxparams ldfs in
+    let continue, ldfs = L.simplify_ldfs state maxparams ldfs in
     if continue then 
       let split = find_bij state maxparams ldfs in
-      let rec aux accu split ldfs = 
+      let rec aux (accu:L.ldfs) split (ldfs:L.ldfs) = 
         match split, ldfs with
-        | [], [] -> tdone := Z.add !tdone (cnp_accu accu)
-        | (s1, s2) :: split, (d,_,len) :: ldfs ->
+        | [], [] -> tdone := Z.add !tdone (L.cnp_ldfs accu)
+        | (s1, s2) :: split, ldf :: ldfs ->
+          let d = ldf.L.n in 
+          let len = ldf.L.p in 
           let len1 = List.length s1 in
           let len2 = len - len1 in
-          aux ((d,s1,len1)::accu) split ldfs;
-          let ldfs = List.rev_append accu ldfs in
+          aux (L.cons d s1 len1 accu) split ldfs;
+          let ldfs = L.rev_append accu ldfs in
           if d <= len2 then 
-            check_all state maxparams ((d,s2,len2)::ldfs);
+            check_all state maxparams (L.cons d s2 len2 ldfs);
           for i1 = 1 to d - 1 do
             let i2 = d - i1 in
             if i1 <= len1 && i2 <= len2 then
-              check_all state maxparams ((i1,s1,len1)::(i2,s2,len2)::ldfs)
+              check_all state maxparams (L.cons i1 s1 len1 (L.cons i2 s2 len2 ldfs))
           done
         | _ -> assert false in
       aux [] split ldfs 
     else 
-      tdone := Z.add !tdone (cnp_accu ldfs);
+      tdone := Z.add !tdone (L.cnp_ldfs ldfs);
    in
-  check_all state maxparams (ldfs:ldfs);
+  check_all state maxparams ldfs;
   Format.eprintf "%a tuples checked@." pp_z !tdone
 
 exception Done
 
-let check_all_para state maxparams (ldfs:ldfs) = 
+let check_all_para state maxparams (ldfs:L.ldfs) = 
   let pipe   = Unix.pipe () in
   let tdone  = Shrcnt.create "/masking.para.tdone" in
   let tprcs  = Shrcnt.create "/masking.para.tprcs" in
@@ -170,8 +210,8 @@ let check_all_para state maxparams (ldfs:ldfs) =
   in
 
   try
-    let to_check = cnp_accu ldfs in
-    let thld = Z.div to_check (Z.of_int 10) in
+    let to_check = L.cnp_ldfs ldfs in
+    let thld = Z.div to_check (Z.of_int 100) in
 
     Format.eprintf "%a to check@." pp to_check;
 
@@ -185,11 +225,11 @@ let check_all_para state maxparams (ldfs:ldfs) =
 
       if Unix.fork () <> 0 then exit 0;
 
-      let rec check_all state maxparams (ldfs:ldfs) = 
+      let rec check_all state maxparams (ldfs:L.ldfs) = 
         let goup, stend = ref false, ref false in
 
-          if Z.gt (cnp_accu ldfs) thld then begin
-            if Shrcnt.get tprcs < 4L then begin
+          if Z.gt (L.cnp_ldfs ldfs) thld then begin
+            if Shrcnt.get tprcs < 16L then begin
             let pid = Unix.fork () in
             if pid = 0 then begin
               if Unix.fork () = 0 then begin
@@ -205,39 +245,41 @@ let check_all_para state maxparams (ldfs:ldfs) =
         end;
 
         if not !goup then begin
-          let continue, ldfs = simplify_ldfs state maxparams ldfs in
+          let continue, ldfs = L.simplify_ldfs state maxparams ldfs in
   
           if continue then 
             let split = find_bij state maxparams ldfs in
             let rec aux accu split ldfs = 
               match split, ldfs with
               | [], [] ->
-                  Shrcnt.update tdone (Z.to_int64 (cnp_accu accu))
+                  Shrcnt.update tdone (Z.to_int64 (L.cnp_ldfs accu))
   
-              | (s1, s2) :: split, (d,_,len) :: ldfs ->
+              | (s1, s2) :: split, ldf  :: ldfs ->
+                  let d = ldf.L.n in 
+                  let len = ldf.L.p in 
                   let len1 = List.length s1 in
                   let len2 = len - len1 in
-                  aux ((d,s1,len1)::accu) split ldfs;
-                  let ldfs = List.rev_append accu ldfs in
+                  aux (L.cons d s1 len1 accu) split ldfs;
+                  let ldfs = L.rev_append accu ldfs in
                   if d <= len2 then 
-                    check_all state maxparams ((d,s2,len2)::ldfs);
+                    check_all state maxparams (L.cons d s2 len2 ldfs);
                   for i1 = 1 to d - 1 do
                     let i2 = d - i1 in
                     if i1 <= len1 && i2 <= len2 then
-                      check_all state maxparams ((i1,s1,len1)::(i2,s2,len2)::ldfs)
+                      check_all state maxparams (L.cons i1 s1 len1 (L.cons i2 s2 len2 ldfs))
                   done
   
               | _ -> assert false
   
             in aux [] split ldfs
           else 
-            Shrcnt.update tdone (Z.to_int64 (cnp_accu ldfs))
+            Shrcnt.update tdone (Z.to_int64 (L.cnp_ldfs ldfs))
         end;
 
         if !stend then raise Done in
 
        try
-         check_all state maxparams (ldfs:ldfs); raise Done
+         check_all state maxparams ldfs; raise Done
        with
        | CanNotCheck le -> begin
            Format.eprintf "%a@." print_error le;
@@ -283,7 +325,7 @@ let check_ni params nb_shares interns outs =
     let state = init_state nb_shares params in
     let order = nb_shares - 1 in 
     let all = List.map (fun e -> e, e) all in
-    let args = [order, all, len] in
+    let args = L.cons order all len [] in
     check_all state order args;
     Format.printf "NI@."
   with CanNotCheck le ->
@@ -301,8 +343,8 @@ let check_fni ?(para = false) s f params nb_shares interns outs =
       let ko = order - ki in
       Format.eprintf "Start checking of ki = %i, ko = %i@." ki ko;
       (if ki <= len_i && ko <= len_o then
-         let args = if ko = 0 then [] else [ko, outs, len_o] in
-         let args = if ki = 0 then args else (ki,interns,len_i) :: args in
+         let args = if ko = 0 then [] else L.cons ko outs len_o [] in
+         let args = if ki = 0 then args else L.cons ki interns len_i args in
          (if para then check_all_para else check_all) state (f ki ko) args);
       Format.eprintf "Checking of done ki = %i, ko = %i@." ki ko;
     done;
