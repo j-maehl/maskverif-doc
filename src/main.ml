@@ -171,12 +171,13 @@ let check_all_para state maxparams (ldfs:ldfs) =
 
   try
     let to_check = cnp_accu ldfs in
+    let thld = Z.div to_check (Z.of_int 10) in
 
     Format.eprintf "%a to check@." pp to_check;
 
-    if Unix.fork () = 0 then begin
-      let count = ref 0 in
+    let pid = Unix.fork () in
 
+    if pid = 0 then begin
       Shrcnt.clr_unlink_on_dispose tdone;
       Shrcnt.clr_unlink_on_dispose tprcs;
       parent := false; Unix.close (fst pipe);
@@ -187,8 +188,8 @@ let check_all_para state maxparams (ldfs:ldfs) =
       let rec check_all state maxparams (ldfs:ldfs) = 
         let goup, stend = ref false, ref false in
 
-          if (incr count; !count) > 256 then begin
-            count := 0; if Shrcnt.get tprcs < 16L then begin
+          if Z.gt (cnp_accu ldfs) thld then begin
+            if Shrcnt.get tprcs < 4L then begin
             let pid = Unix.fork () in
             if pid = 0 then begin
               if Unix.fork () = 0 then begin
@@ -252,6 +253,7 @@ let check_all_para state maxparams (ldfs:ldfs) =
       
     end else begin
       Unix.close (snd pipe);
+      ignore (Unix.waitpid [] pid : int * _);
       let rec wait () =
         let rds, _, _ = Unix.select [fst pipe] [] [] 5.0 in
         if List.is_empty rds then begin
@@ -259,6 +261,8 @@ let check_all_para state maxparams (ldfs:ldfs) =
             "%a checked over %a in %.3f@."
             pp (Z.of_int64 (Shrcnt.get tdone))
             pp to_check (Sys.time () -. t0);
+          Format.eprintf
+            "# processes : %Ld@." (Shrcnt.get tprcs);
           wait ()
         end else begin
           Unix.read (fst pipe) (Bytes.make 1 '.') 0 1 = 0
@@ -427,7 +431,7 @@ let doit3 n k1 k2  =
 (* let _ = doit2 8 1 *)
 
 (* Ok in 0m0.494 s *)
-let _ = doit2 9 1
+(* let _ = doit2 9 1 *)
 
 (* Marche pas *)
 (* let _ = doit2 10 1 *)
@@ -448,7 +452,7 @@ let _ = doit2 9 1
 (* let _ = doit2 11 2 *)
 
 (* Ok in 49.044 s *)
-(* let _ = doit2 12 2 *)
+let _ = doit2 12 2
 
 (* Ok in 10m31.869 s *)
 (*let _ = doit2 13 2 *)
