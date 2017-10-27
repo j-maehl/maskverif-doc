@@ -333,10 +333,13 @@ let simplify_until state k =
   
 (* ----------------------------------------------------------------------- *)
 
+let set_top_node state n = 
+  Vector.push state.s_top n;
+  add_children state n top_node
+
 let add_top_expr state e = 
   let n = add_expr state e in
-  Vector.push state.s_top n;
-  add_children state n top_node;
+  set_top_node state n;
   n
 
 (*
@@ -421,6 +424,7 @@ let simplify_until_with_clear state excepted k =
       remove_used_share_except state excepted 
   done
 
+(*
 let find_used_share info = 
   try 
     Pinfo.iter (fun na -> 
@@ -438,18 +442,19 @@ let find_top n =
     if !has then raise (Found n) in
   try aux n; assert false
   with Found n -> n
+ *)
 
 (*
 exception CanNotCheck of expr list
 
 type removable = {
    nb_to_keep : int;
-   removable  : node Vector.t  
+   removable  : (node*expr) Vector.t  
 }
 
 let dummy_removable = 
   { nb_to_keep = 0;
-    removable = Vector.create 0 top_node; }
+    removable = Vector.create 0 (top_node, top); }
 
 let _ = Random.self_init ()
 
@@ -457,12 +462,13 @@ let simplify_until_with_clear2 state k can_remove =
   let len = state.s_nb_shares in 
   let cr = Vector.create len dummy_removable in
   let add (k, ees, len) =
-    let v = Vector.create len top_node in
-    let add_node (e1,_) = Vector.push v (add_expr state e1) in
+    let v = Vector.create len (top_node,top) in
+    let add_node (e1,_) = Vector.push v (add_expr state e1, e1) in
     List.iter add_node ees;
     let rm = { nb_to_keep = k; removable = v } in
     Vector.push cr rm in
   List.iter add can_remove;
+  let removed = ref [] in
   let select_top () = 
     let cr_size = Vector.size cr in
     if cr_size = 0 then raise (CanNotCheck (get_top state));
@@ -470,20 +476,35 @@ let simplify_until_with_clear2 state k can_remove =
     let rm = Vector.get cr k in
     let size = Vector.size rm.removable in
     let i = Random.int size in
-    let n = Vector.get rm.removable i in
+    let n,e = Vector.get rm.removable i in
     if size - 1 <= rm.nb_to_keep then Vector.unset cr k 
     else Vector.unset rm.removable i;
+    removed := e :: !removed;
     n in
   let rec aux () = 
     if not (simplify_until state k) then
       let ti = select_top () in
-      remove_node_and_all_children state ti;
-      Format.eprintf "remove %a@." pp_expr ti.expr_desc;
+      remove_child state ti top_node;
+(*      Format.eprintf "remove %a@." pp_expr ti.expr_desc; *)
       Vector.remove (N.equal ti) state.s_top;
       aux () in
-  aux ()
+  aux ();
 
+  let used_share = used_share state in
+  let tops = Vector.copy state.s_top in
+  let bij  = Stack.copy state.s_bij in
+  clear_state state;
+  Vector.iter (fun n -> ignore (add_top_expr state n.expr_desc)) tops;  
+  Stack.iter (fun (r, _) -> apply_bij state r) bij;
+  List.iter (fun e -> ignore (add_top_expr state e)) !removed;
+  
+  clear_bijection state;    
+  simplify_until_with_clear state used_share k 
+  
+   
+  
  *)
+
 
 
 (* ----------------------------------------------------------------------- *)

@@ -68,6 +68,11 @@ module Stack = struct
     mutable st_top  : int
   }
 
+ let copy t = {
+      st_top = t.st_top;
+      st_buff = Array.sub t.st_buff 0 t.st_top;
+    }
+
   let make n a = {
     st_buff = Array.make n a;
     st_top  = 0;
@@ -106,6 +111,11 @@ module Vector = struct
     mutable last : int;
     mutable arr  : 'a array;
   }
+
+  let copy t = {
+      last = t.last;
+      arr = Array.sub t.arr 0 t.last;
+    }
 
   let size v = v.last
 

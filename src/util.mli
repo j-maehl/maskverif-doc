@@ -35,7 +35,7 @@ module Stack :
     val push : 'a t -> 'a -> unit
     val pop  : 'a t -> 'a 
     val clear: 'a t -> unit 
-
+    val copy : 'a t -> 'a t
     val to_list : 'a t -> 'a list
     val iter : ('a -> unit) -> 'a t -> unit
   end
@@ -49,6 +49,7 @@ module Vector : sig
 
   val dummy  : unit -> 'a t
   val create : int -> 'a -> 'a t
+  val copy   : 'a t -> 'a t
   val clear  : 'a t -> unit 
   val get    : 'a t -> int -> 'a
   val push   : 'a t -> 'a -> unit

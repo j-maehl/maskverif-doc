@@ -97,6 +97,7 @@ let print_error fmt lhd =
     (pp_list ",@ " (fun fmt (_,e2) -> pp_expr fmt e2)) lhd
     (pp_list ",@ " (fun fmt (e1,_) -> pp_expr fmt e1)) lhd
 
+
 let find_bij state maxparams ldfs =
   let lhd = L.lfirst ldfs in
   clear_state state;
@@ -110,6 +111,7 @@ let find_bij state maxparams ldfs =
     let used_share = used_share state in
     L.set_top_exprs2 state ldfs;
     clear_bijection state;    
+    init_todo state;
     simplify_until_with_clear state used_share maxparams;
     let is_in (e1, _) = is_top_expr state e1 in
     List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
@@ -144,8 +146,8 @@ let find_bij state maxparams ldfs =
   in
   let is_in (e1, _) = is_top_expr state e1 in
   List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs
- *)
  
+ *)
 let pp_z fmt z = 
   let s = Z.to_string z in
   let len = Bytes.length s in
@@ -437,7 +439,7 @@ let mk_interns outs =
   res
 
 let main_sni params nb_shares outs = 
-  check_sni ~para:true params nb_shares (mk_interns outs) outs
+  check_sni ~para:false params nb_shares (mk_interns outs) outs
 
 let main_ni params nb_shares outs = 
   check_ni params nb_shares (mk_interns outs) outs
@@ -562,10 +564,10 @@ let doit3 n k1 k2  =
 (* let _ = doit2 11 2 *)
 
 (* Ok in 49.044 s *)
-(* let _ = doit2 12 2 *)
+ let _ = doit2 12 2 
 
 (* Ok in 10m31.869 s *)
- let _ = doit2 13 2  
+(* let _ = doit2 13 2 *)
 
 (* 
   decalage de 2   
