@@ -112,7 +112,39 @@ let find_bij state maxparams ldfs =
     clear_bijection state;    
     simplify_until_with_clear state used_share maxparams;
     let is_in (e1, _) = is_top_expr state e1 in
-    List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs
+    List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
+
+(*
+exception Found_ee of (expr * expr)
+
+let rec can_remove ldfs =
+  match ldfs with
+  | [] -> [] 
+  | ldf :: ldfs ->
+    let cr = can_remove ldfs in
+    if ldf.L.n < ldf.L.p then (ldf.L.n, ldf.L.l, ldf.L.p) :: cr
+    else cr
+
+let find_bij state maxparams ldfs =
+  clear_state state;
+  L.set_top_exprs2 state ldfs;
+  init_todo state;
+  let _ = 
+    try simplify_until_with_clear2 state maxparams (can_remove ldfs)
+    with State.CanNotCheck le ->
+      let find e =
+        try 
+          List.iter (fun ldf ->
+              List.iter (fun (e1,e2) -> 
+                  if E.equal e e1 then 
+                    raise (Found_ee(e1,e2))) ldf.L.l) ldfs;
+          assert false
+        with Found_ee ee -> ee in
+      raise (CanNotCheck (List.map find le))
+  in
+  let is_in (e1, _) = is_top_expr state e1 in
+  List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs
+ *)
  
 let pp_z fmt z = 
   let s = Z.to_string z in
@@ -164,6 +196,12 @@ let check_all state maxparams (ldfs:L.ldfs) =
       Format.eprintf "%a tuples checked over %a in %.3f@."
         pp_z !tdone pp_z to_check (Sys.time () -. t0);
 
+(*    let pp_ldf fmt ldf = 
+      Format.fprintf fmt "[%i : %a]" ldf.L.n 
+          (Util.pp_list ", " (fun fmt (e1,_e2) -> pp_expr fmt e1)) ldf.L.l in
+    Format.eprintf "check_all %a@." 
+               (Util.pp_list " " pp_ldf) ldfs;  *)
+
     let continue, ldfs = L.simplify_ldfs state maxparams ldfs in
     if continue then 
       let split = find_bij state maxparams ldfs in
@@ -174,6 +212,14 @@ let check_all state maxparams (ldfs:L.ldfs) =
           let d = ldf.L.n in 
           let len = ldf.L.p in 
           let len1 = List.length s1 in
+          if not (d <= len1) then begin
+              Format.eprintf "d = %i@." d;
+              Format.eprintf "ldf = %a@."
+                (pp_list ";  " (fun fmt (e1,_e2) -> pp_expr fmt e1)) ldf.L.l;
+              Format.eprintf "s1 = %a@."
+                (pp_list ";  " (fun fmt (e1,_e2) -> pp_expr fmt e1)) s1;
+            assert false  
+          end;
           let len2 = len - len1 in
           aux (L.cons d s1 len1 accu) split ldfs;
           let ldfs = L.rev_append accu ldfs in
@@ -236,7 +282,7 @@ let check_all_para state maxparams (ldfs:L.ldfs) =
           let goup, stend = ref false, ref false in
 
           if Z.gt (L.cnp_ldfs ldfs) thld && Z.lt (L.cnp_ldfs ldfs) thld_h then begin
-              if Shrcnt.get tprcs < 16L then begin
+              if Shrcnt.get tprcs < 4L then begin
                   let pid = Unix.fork () in
                   if pid = 0 then begin
                       if Unix.fork () = 0 then begin
@@ -356,6 +402,14 @@ let check_fni ?(para = false) s f params nb_shares interns outs =
 let check_sni ?para = check_fni ?para "SNI" (fun ki _ko -> ki)
 let check_fni ?para = check_fni ?para "FNI" 
 
+let rec size e = 
+  match e.e_node with
+  | Etop | Ernd _ | Eshare _ -> 1 
+  | Eadd(e1,e2) | Emul(e1,e2) ->
+    let s1 = size e1 in
+    let s2 = size e2 in
+    (if s1 < s2 then s2 else s1) + 1
+
 let mk_interns outs = 
   let souts = Se.of_list outs in
   let rec aux interns e = 
@@ -367,7 +421,20 @@ let mk_interns outs =
       | _ -> interns 
     else interns in
   let interns = List.fold_left aux Se.empty outs in
-  Se.elements interns
+  let res = List.rev (Se.elements interns) in
+(*
+  let res = 
+    List.sort (fun e1 e2 -> 
+        let cmp = size e2 - size e1 in
+        if cmp = 0 then
+          match e1.e_node, e2.e_node with
+          | Eshare _, _  -> 1
+          | _ , Eshare _ -> -1
+          | _, _ -> 0
+        else cmp
+      ) res in *)
+  List.iter (Format.eprintf "%a@." pp_expr) res;
+  res
 
 let main_sni params nb_shares outs = 
   check_sni ~para:true params nb_shares (mk_interns outs) outs
@@ -419,11 +486,11 @@ let refresh_a a n r k l =
       let c = vadd (vadd c r) rk in
       aux c l
     | [] -> 
-      vadd c (Lazy.force a) in
+      vadd c a (*Lazy.force a*) in
   aux c l
   
 let refresh n r k l = 
-  refresh_a (Lazy.from_fun (fun () -> vshare a n)) n r k l
+  refresh_a (vshare a n) (*Lazy.from_fun (fun () -> vshare a n)*) n r k l
 
 let refresh2 n k = refresh n "r" 1 ["s", k] 
 
@@ -498,7 +565,7 @@ let doit3 n k1 k2  =
 (* let _ = doit2 12 2 *)
 
 (* Ok in 10m31.869 s *)
-let _ = doit2 13 2 
+ let _ = doit2 13 2  
 
 (* 
   decalage de 2   
@@ -653,13 +720,14 @@ let mul10 =
   let b = vshare b n   in
   mk_mul10 a b 
 
+(*
 let square10 = 
   let n = 10 in
   let a = vshare a n   in
-  let a1 = refresh_a (Lazy.from_val a) n "u" 1 [] in
-  let a2 = refresh_a (Lazy.from_val a) n "v" 2 [] in
+  let a1 = refresh_a a (*Lazy.from_val a*) n "u" 1 [] in
+  let a2 = refresh_a a (*Lazy.from_val a*) n "v" 2 [] in
   mk_mul10 a1 a2
-  
+ *)
 
 (*
 let _ = 

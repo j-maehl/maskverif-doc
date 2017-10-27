@@ -71,11 +71,18 @@ module HE = struct
 
   let equal e1 e2 = equal_node e1.e_node e2.e_node 
 
+(*  let hash_node = function
+    | Etop        -> 1
+    | Ernd r      -> (V.hash r lsl 3) + 2
+    | Eshare(p,i) -> (((V.hash p lsl 8) + i) lsl 3) + 3
+    | Eadd(e1,e2) -> (((e_hash e1 lsl 8) + (e_hash e2 lsl 1)) lsl 3) + 4
+    | Emul(e1,e2) -> ((e_hash e1 lsl 8) + (e_hash e2 lsl 1) lsl 3) + 5 *)
+
   let hash_node = function
     | Etop        -> 1
-    | Ernd r      -> V.hash r
+    | Ernd r      -> V.hash r 
     | Eshare(p,i) -> (V.hash p lsl 8) + i
-    | Eadd(e1,e2) -> (e_hash e1 lsl 8) + (e_hash e2 lsl 1) 
+    | Eadd(e1,e2) -> (e_hash e1 lsl 8) + (e_hash e2 lsl 1)
     | Emul(e1,e2) -> (e_hash e1 lsl 8) + (e_hash e2 lsl 1) + 1
 
   let hash e = hash_node e.e_node
@@ -121,22 +128,24 @@ let mul e1 e2 = E.mk_expr (Emul(e1,e2))
 
 let pp_expr fmt e =
   let rec aux top fmt e = 
-    match e.e_node with
-    | Etop        -> Format.fprintf fmt "TOP"
-    | Ernd r      -> pp_rnd fmt r
-    | Eshare(p,i) -> pp_share fmt (p,i)
-    | Eadd(e1,e2) -> 
-      begin match top with
-      | `AddR | `MulL | `MulR ->
-        Format.fprintf fmt "(%a + %a)" (aux `AddL) e1 (aux `AddR) e2
-      | _ -> 
-        Format.fprintf fmt "%a + %a" (aux `AddL) e1 (aux `AddR) e2
-      end
-    | Emul(e1,e2) -> 
-      begin match top with
-      | `MulR -> 
-        Format.fprintf fmt "(%a.%a)" (aux `MulL) e1 (aux `MulR) e2
-      | _ ->
-        Format.fprintf fmt "%a.%a" (aux `MulL) e1 (aux `MulR) e2
-      end in
+(*    let pp_e fmt e = *)
+      match e.e_node with
+      | Etop        -> Format.fprintf fmt "TOP"
+      | Ernd r      -> pp_rnd fmt r
+      | Eshare(p,i) -> pp_share fmt (p,i)
+      | Eadd(e1,e2) -> 
+        begin match top with
+        | `AddR | `MulL | `MulR ->
+          Format.fprintf fmt "(%a + %a)" (aux `AddL) e1 (aux `AddR) e2
+        | _ -> 
+          Format.fprintf fmt "%a + %a" (aux `AddL) e1 (aux `AddR) e2
+        end
+      | Emul(e1,e2) -> 
+        begin match top with
+        | `MulR -> 
+          Format.fprintf fmt "(%a.%a)" (aux `MulL) e1 (aux `MulR) e2
+        | _ ->
+          Format.fprintf fmt "%a.%a" (aux `MulL) e1 (aux `MulR) e2
+        end in
+   (* Format.fprintf fmt "(%a:%i)" pp_e e e.e_id in *)
   aux `Top fmt e

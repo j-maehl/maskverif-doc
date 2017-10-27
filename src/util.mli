@@ -50,6 +50,7 @@ module Vector : sig
   val dummy  : unit -> 'a t
   val create : int -> 'a -> 'a t
   val clear  : 'a t -> unit 
+  val get    : 'a t -> int -> 'a
   val push   : 'a t -> 'a -> unit
   val size   : 'a t -> int
   val pop    : 'a t -> 'a 
@@ -57,6 +58,7 @@ module Vector : sig
 
   (* remove all elements satisfying the predicate *)
   val remove : ('a -> bool) -> 'a t -> unit
+  val unset  : 'a t -> int -> unit                                         
 
   val iter   : ('a -> unit) -> 'a t -> unit
   val exists : ('a -> bool) -> 'a t -> bool

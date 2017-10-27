@@ -118,13 +118,14 @@ end
 (* ----------------------------------------------------------------------- *)
 
 type state = {
-          s_count    : Count.t;
-          s_hash     : node He.t;
-          s_params   : Pinfo.t Hv.t;
-          s_randoms  : node Stack.t;  (* random nodes *)
-          s_todo     : node Stack.t;  (* next random to eliminate *)
-          s_top      : node Vector.t; (* parents of top *)
-          s_bij      : (node*node) Stack.t;
+    s_nb_shares: int;
+    s_count    : Count.t;
+    s_hash     : node He.t;
+    s_params   : Pinfo.t Hv.t;
+    s_randoms  : node Stack.t;  (* random nodes *)
+    s_todo     : node Stack.t;  (* next random to eliminate *)
+    s_top      : node Vector.t; (* parents of top *)
+    s_bij      : (node*node) Stack.t;
   }
 
 
@@ -143,7 +144,8 @@ let init_state nb_shares params =
   He.add s_hash top top_node;
 
   (* Build the final state *)
-  { s_count;
+  { s_nb_shares = nb_shares;
+    s_count;
     s_hash;
     s_params;
     s_randoms = Stack.make 1000 top_node;
@@ -160,6 +162,10 @@ let clear_state state =
   Stack.clear state.s_todo;
   Vector.clear state.s_top;
   Stack.clear state.s_bij
+
+let get_top state = 
+  let ns = Vector.to_list state.s_top in
+  List.map (fun n -> n.expr_desc) ns
 
 (* ----------------------------------------------------------------------- *)
 
@@ -414,6 +420,71 @@ let simplify_until_with_clear state excepted k =
     if not (simplify state) then 
       remove_used_share_except state excepted 
   done
+
+let find_used_share info = 
+  try 
+    Pinfo.iter (fun na -> 
+        if Vector.size na.children <> 0 then raise (Found na)) info;
+    assert false
+  with Found n -> n
+
+let find_top n = 
+  let rec aux n = 
+    let has = ref false in
+    let doit c = 
+      if N.equal c top_node then has := true
+      else aux c in
+    Vector.iter doit n.children;
+    if !has then raise (Found n) in
+  try aux n; assert false
+  with Found n -> n
+
+(*
+exception CanNotCheck of expr list
+
+type removable = {
+   nb_to_keep : int;
+   removable  : node Vector.t  
+}
+
+let dummy_removable = 
+  { nb_to_keep = 0;
+    removable = Vector.create 0 top_node; }
+
+let _ = Random.self_init ()
+
+let simplify_until_with_clear2 state k can_remove = 
+  let len = state.s_nb_shares in 
+  let cr = Vector.create len dummy_removable in
+  let add (k, ees, len) =
+    let v = Vector.create len top_node in
+    let add_node (e1,_) = Vector.push v (add_expr state e1) in
+    List.iter add_node ees;
+    let rm = { nb_to_keep = k; removable = v } in
+    Vector.push cr rm in
+  List.iter add can_remove;
+  let select_top () = 
+    let cr_size = Vector.size cr in
+    if cr_size = 0 then raise (CanNotCheck (get_top state));
+    let k = Random.int cr_size in
+    let rm = Vector.get cr k in
+    let size = Vector.size rm.removable in
+    let i = Random.int size in
+    let n = Vector.get rm.removable i in
+    if size - 1 <= rm.nb_to_keep then Vector.unset cr k 
+    else Vector.unset rm.removable i;
+    n in
+  let rec aux () = 
+    if not (simplify_until state k) then
+      let ti = select_top () in
+      remove_node_and_all_children state ti;
+      Format.eprintf "remove %a@." pp_expr ti.expr_desc;
+      Vector.remove (N.equal ti) state.s_top;
+      aux () in
+  aux ()
+
+ *)
+
 
 (* ----------------------------------------------------------------------- *)
 

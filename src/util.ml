@@ -122,6 +122,17 @@ module Vector = struct
       v.arr <- narr
     end
 
+  let get v n = 
+    if 0 <= n && n < v.last then Array.unsafe_get v.arr n
+    else raise (Invalid_argument "index out of bounds")
+
+  let unset v n =
+    if 0 <= n && n < v.last then begin
+      if n <> v.last - 1 then
+        Array.blit v.arr (n+1) v.arr n (v.last - (n+1));
+      v.last <- v.last - 1
+    end else raise (Invalid_argument "index out of bounds")
+    
   let push v a = 
     resize v;
     let n = v.last in

@@ -46,7 +46,12 @@ val clear_bijection : state -> unit
 
 val used_share : state -> node -> bool
 
+(* exception CanNotCheck of expr list *)
+
 val simplify_until_with_clear : state -> (node -> bool) -> int -> unit 
+
+(*val simplify_until_with_clear2 : 
+  state -> int -> (int * (expr * expr) list * int) list -> unit *)
 
 (* ----------------------------------------------------------------------- *)
 
