@@ -10,9 +10,21 @@ module List : sig
 val partition :
   ('a -> bool) -> 'a list -> 'a list -> 'a list -> 'a list * 'a list
 
-val pp_list :
-  ('a, 'b, 'c, 'd, 'd, 'a) format6 ->
-  (Format.formatter -> 'e -> unit) -> Format.formatter -> 'e list -> unit
+type 'a pp = Format.formatter -> 'a -> unit
+
+val pp_if    : bool -> 'a pp -> 'a pp -> 'a pp
+val pp_maybe : bool -> ('a pp -> 'a pp) -> 'a pp -> 'a pp
+
+val pp_enclose:
+       pre:('a, 'b, 'c, 'd, 'd, 'a) format6
+   -> post:('a, 'b, 'c, 'd, 'd, 'a) format6
+   -> 'a pp -> 'a pp
+
+val pp_paren : 'a pp -> 'a pp
+val pp_maybe_paren : bool -> 'a pp -> 'a pp
+
+val pp_list : ('a, 'b, 'c, 'd, 'd, 'a) format6 -> 'a pp -> 'a list pp
+
 
 (* ----------------------------------------------------------------------- *)
 module Mint : Map.S with type key = int
@@ -23,6 +35,7 @@ module Array : sig
     include module type of Array
 
     val for_all : ('a -> bool) -> 'a array -> bool
+    val for_all2 : ('a -> 'b -> bool) -> 'a array -> 'b array -> bool 
   end
 
 (* ----------------------------------------------------------------------- *)
@@ -66,3 +79,45 @@ module Vector : sig
 
   val to_list : 'a t -> 'a list                                       
 end
+
+(* ------------------------------------------------------------------------ *)
+
+type location = {
+  lc_fname : string;
+  lc_start : int * int;
+  lc_end   : int * int;
+  lc_bchar : int;
+  lc_echar : int;
+}
+
+(* -------------------------------------------------------------------- *)
+type 'a located = { pl_data: 'a; pl_location: location; }
+
+val mkloc : location -> 'a -> 'a located
+
+val loc  : 'a located -> location 
+val data : 'a located -> 'a 
+
+(* -------------------------------------------------------------------- *)
+
+module Location : sig
+  open Lexing
+
+  type t = location
+
+  val make      : position -> position -> t
+  val of_lexbuf : lexbuf -> t
+  val to_string : t -> string
+end 
+
+val warning : 
+  ?loc:Location.t -> ('a, Format.formatter, unit, unit) format4 -> 'a
+
+
+exception Error of (string * Location.t option * string)
+
+val error : 
+  string -> Location.t option -> ('a, Format.formatter, unit, 'b) format4 -> 'a
+
+val pp_error : 
+  Format.formatter -> string * Location.t option * string -> unit

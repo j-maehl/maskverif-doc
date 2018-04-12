@@ -15,7 +15,16 @@ module List = struct
 
 end
 
+let rec partition f lin lout l = 
+  match l with
+  | [] -> lin, lout
+  | e::l -> 
+    if f e then partition f (e::lin) lout l
+    else partition f lin (e::lout) l
+
 (* ----------------------------------------------------------------------- *)
+type 'a pp = Format.formatter -> 'a -> unit
+
 let rec pp_list sep pp fmt xs =
   let pp_list = pp_list sep pp in
   match xs with
@@ -23,12 +32,22 @@ let rec pp_list sep pp fmt xs =
   | [x]     -> Format.fprintf fmt "%a" pp x
   | x :: xs -> Format.fprintf fmt "%a%(%)%a" pp x sep pp_list xs
 
-let rec partition f lin lout l = 
-  match l with
-  | [] -> lin, lout
-  | e::l -> 
-    if f e then partition f (e::lin) lout l
-    else partition f lin (e::lout) l
+let pp_enclose ~pre ~post pp fmt x =
+  Format.fprintf fmt "%(%)%a%(%)" pre pp x post
+
+let pp_paren pp fmt x =
+  pp_enclose "(" ")" pp fmt x
+
+let pp_if c pp1 pp2 fmt x =
+  match c with
+  | true  -> Format.fprintf fmt "%a" pp1 x
+  | false -> Format.fprintf fmt "%a" pp2 x
+
+let pp_maybe c tx pp fmt x =
+  pp_if c (tx pp) pp fmt x
+
+let pp_maybe_paren c pp =
+  pp_maybe c pp_paren pp
 
 (* ----------------------------------------------------------------------- *)
 module OrderedInt = struct
@@ -53,6 +72,11 @@ module Array = struct
   let for_all f t = 
     let rec aux i = f t.(i) && (i = 0 || aux (i-1)) in
     aux (length t - 1)
+
+  let for_all2 f t1 t2 =
+    Array.length t1 = Array.length t2 &&
+      let rec aux i = f t1.(i) t2.(i) && (i = 0 || aux (i-1)) in
+      aux (length t1 - 1)
 end 
 
 let finally final f a =
@@ -195,8 +219,99 @@ module Vector = struct
 
 end
    
+(* ----------------------------------------------------------------- *)
 
+type location = {
+  lc_fname : string;
+  lc_start : int * int;
+  lc_end   : int * int;
+  lc_bchar : int;
+  lc_echar : int;
+}
 
+(* -------------------------------------------------------------------- *)
+type 'a located = { pl_data: 'a; pl_location: location; }
+
+let mkloc (lc : location) (x : 'a) =
+  { pl_data = x; pl_location = lc; }
+
+let loc  { pl_location = lc } = lc
+let data { pl_data     = dt } = dt
+
+(* -------------------------------------------------------------------- *)
+
+module Location : sig
+  open Lexing
+
+  type t = location
+
+  val make      : position -> position -> t
+  val of_lexbuf : lexbuf -> t
+  val to_string : t -> string
+end = struct
+  open Lexing
+
+  type t = location
+
+  let make (p1 : position) (p2 : position) =
+    let mkpos (p : position) = (p.pos_lnum, p.pos_cnum - p.pos_bol) in
+    { lc_fname = p1.pos_fname;
+      lc_start = mkpos p1    ;
+      lc_end   = mkpos p2    ;
+      lc_bchar = p1.pos_cnum ;
+      lc_echar = p2.pos_cnum ; }
+
+  let of_lexbuf (lexbuf : lexbuf) =
+    let p1 = Lexing.lexeme_start_p lexbuf in
+    let p2 = Lexing.lexeme_end_p lexbuf in
+    make p1 p2
+
+  let to_string (lc : t) =
+    let spos =
+      if lc.lc_start = lc.lc_end then
+        Printf.sprintf "line %d (%d)"
+          (fst lc.lc_start) (snd lc.lc_start)
+      else if fst lc.lc_start = fst lc.lc_end then
+        Printf.sprintf "line %d (%d-%d)"
+          (fst lc.lc_start) (snd lc.lc_start) (snd lc.lc_end)
+      else
+        Printf.sprintf "line %d (%d) to line %d (%d)"
+          (fst lc.lc_start) (snd lc.lc_start)
+          (fst lc.lc_end  ) (snd lc.lc_end  )
+    in
+      Printf.sprintf "%s: %s" lc.lc_fname spos
+end
+ 
+let warning ?loc fmt = 
+  let buf  = Buffer.create 127 in
+  let bfmt = Format.formatter_of_buffer buf in
+  let loc = 
+    match loc with
+    | None -> ""
+    | Some loc -> "at "^(Location.to_string loc) in
+  Format.kfprintf (fun _ ->
+    Format.pp_print_flush bfmt ();
+    let msg = Buffer.contents buf in
+    Format.eprintf "Warning %s: %s" loc msg) bfmt fmt
+
+exception Error of (string * Location.t option * string)
+
+let error s loc fmt = 
+  let buf  = Buffer.create 127 in
+  let bfmt = Format.formatter_of_buffer buf in
+  Format.kfprintf (fun _ ->
+    Format.pp_print_flush bfmt ();
+    let msg = Buffer.contents buf in
+    raise (Error(s,loc,msg))) bfmt fmt
+
+let pp_error fmt (s,loc,msg) = 
+  let pp_loc fmt loc = 
+    match loc with
+    | None -> ()
+    | Some loc -> Format.fprintf fmt " at %s" (Location.to_string loc) in
+  Format.fprintf fmt "%s%a: %s" s pp_loc loc msg
+
+  
       
 
     

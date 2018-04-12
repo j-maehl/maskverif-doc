@@ -15,8 +15,12 @@ and descriptor =
 | Top
 | Rnd   of rnd 
 | Share of param * int 
+| Neg   of node 
 | Add   of node * node
 | Mul   of node * node
+| Tuple of bool * node array
+  (* Invariant [Tuple(b,ns)]
+       if [b] is true there is no duplicate in the array [ns] *)
 
 module N = struct 
   type t = node
@@ -35,6 +39,7 @@ let is_rnd_for_bij n =
   Vector.size n.children = 1 && is_rnd n &&
     let c = Vector.top n.children in
     match c.descriptor with
+    | Neg _      -> true
     | Add(n1,n2) -> not (N.equal n1 n2)
     | _          -> false
 
@@ -56,8 +61,14 @@ let pp_descriptor fmt = function
   | Top        -> Format.fprintf fmt "TOP"
   | Rnd i      -> pp_rnd fmt i
   | Share (p,i)-> pp_share fmt (p,i)
+  | Neg e      -> Format.fprintf fmt "!%i" e.node_id
   | Add(e1,e2) -> Format.fprintf fmt "%i + %i" e1.node_id e2.node_id
   | Mul(e1,e2) -> Format.fprintf fmt "%i * %i" e1.node_id e2.node_id
+  | Tuple(_,es)->
+    Format.fprintf fmt "(@[%a@])" 
+      (pp_list "@, "(fun fmt e -> Format.fprintf fmt "%i" e.node_id)) 
+      (Array.to_list es)
+    
 
 let pp_children fmt children = 
   Vector.iter (fun c -> Format.fprintf fmt "%i;" c.node_id) children
@@ -220,9 +231,25 @@ let set_parents state n =
   | Rnd _   -> ()
   | Share _ -> ()
   | Top     -> ()
+  | Neg p   -> add_children state p n 
   | Add(p1,p2) | Mul(p1,p2) -> 
     add_children state p1 n;
     if not (N.equal p1 p2) then add_children state p2 n
+  | Tuple(b, ps) ->
+    if b then (* No duplicate *)
+      for i = 0 to Array.length ps - 1 do
+        add_children state ps.(i) n
+      done
+    else
+      let tbl = Hn.create (2 * Array.length ps) in
+      for i = 0 to Array.length ps - 1 do
+        let p = ps.(i) in
+        if not (Hn.mem tbl p) then
+          (Hn.add tbl p (); add_children state p n)
+      done
+      
+    
+
 
 let rec add_expr state e = 
   try He.find state.s_hash e 
@@ -232,6 +259,9 @@ let rec add_expr state e =
       | Etop         -> assert false 
       | Ernd r       -> Rnd r
       | Eshare(p, i) -> Share(p,i)
+      | Eneg e       -> 
+        let n = add_expr state e in
+        Neg n
       | Eadd(e1,e2)  ->
         let n1 = add_expr state e1 in
         let n2 = add_expr state e2 in
@@ -240,6 +270,9 @@ let rec add_expr state e =
         let n1 = add_expr state e1 in
         let n2 = add_expr state e2 in
         Mul(n1,n2)
+      | Etuple(b, es) ->
+        let ns = Array.map (add_expr state) es in
+        Tuple(b, ns)
     in
     let n = 
       { node_id    = Count.next state.s_count;
@@ -278,13 +311,19 @@ and remove_node state n =
   | Top   -> assert false 
   | Rnd _ -> ()
   | Share(a,_) -> rm_used_share state a 
+  | Neg p -> remove_child state p n
   | Add(p1,p2) | Mul(p1,p2) ->
     remove_child state p1 n;
     remove_child state p2 n
+  | Tuple(_,ps) ->
+    for i = 0 to Array.length ps - 1 do
+      remove_child state ps.(i) n
+    done
 
 let remove_other_parent state p c = 
   match c.descriptor with
-  | (Add(p1,p2) | Mul(p1,p2))  when (N.equal p p1 || N.equal p p2) ->
+  | Neg _ -> ()
+  | Add(p1,p2) when (N.equal p p1 || N.equal p p2) ->
     if not (N.equal p p1) then remove_child state p1 c;
     if not (N.equal p p2) then remove_child state p2 c
   | _ -> assert false 
@@ -342,12 +381,6 @@ let add_top_expr state e =
   set_top_node state n;
   n
 
-(*
-let remove_top state n = 
-  Vector.remove (N.equal n) state.s_top;
-  remove_child state n top_node
-*)
-
 (* ----------------------------------------------------------------------- *)
 
 let simplified_expr state = 
@@ -360,8 +393,11 @@ let simplified_expr state =
         | Top        -> top
         | Rnd r      -> rnd r
         | Share(p,i) -> share p i
+        | Neg n      -> neg (aux n)
         | Add(n1,n2) -> add (aux n1) (aux n2)
-        | Mul(n1,n2) -> mul (aux n1) (aux n2) in
+        | Mul(n1,n2) -> mul (aux n1) (aux n2) 
+        | Tuple(b, ns) -> unsafe_tuple b (Array.map aux ns)
+      in
       Hn.add tbl n e;
       e in
   let doit e = 
@@ -423,89 +459,6 @@ let simplify_until_with_clear state excepted k =
     if not (simplify state) then 
       remove_used_share_except state excepted 
   done
-
-(*
-let find_used_share info = 
-  try 
-    Pinfo.iter (fun na -> 
-        if Vector.size na.children <> 0 then raise (Found na)) info;
-    assert false
-  with Found n -> n
-
-let find_top n = 
-  let rec aux n = 
-    let has = ref false in
-    let doit c = 
-      if N.equal c top_node then has := true
-      else aux c in
-    Vector.iter doit n.children;
-    if !has then raise (Found n) in
-  try aux n; assert false
-  with Found n -> n
- *)
-
-(*
-exception CanNotCheck of expr list
-
-type removable = {
-   nb_to_keep : int;
-   removable  : (node*expr) Vector.t  
-}
-
-let dummy_removable = 
-  { nb_to_keep = 0;
-    removable = Vector.create 0 (top_node, top); }
-
-let _ = Random.self_init ()
-
-let simplify_until_with_clear2 state k can_remove = 
-  let len = state.s_nb_shares in 
-  let cr = Vector.create len dummy_removable in
-  let add (k, ees, len) =
-    let v = Vector.create len (top_node,top) in
-    let add_node (e1,_) = Vector.push v (add_expr state e1, e1) in
-    List.iter add_node ees;
-    let rm = { nb_to_keep = k; removable = v } in
-    Vector.push cr rm in
-  List.iter add can_remove;
-  let removed = ref [] in
-  let select_top () = 
-    let cr_size = Vector.size cr in
-    if cr_size = 0 then raise (CanNotCheck (get_top state));
-    let k = Random.int cr_size in
-    let rm = Vector.get cr k in
-    let size = Vector.size rm.removable in
-    let i = Random.int size in
-    let n,e = Vector.get rm.removable i in
-    if size - 1 <= rm.nb_to_keep then Vector.unset cr k 
-    else Vector.unset rm.removable i;
-    removed := e :: !removed;
-    n in
-  let rec aux () = 
-    if not (simplify_until state k) then
-      let ti = select_top () in
-      remove_child state ti top_node;
-(*      Format.eprintf "remove %a@." pp_expr ti.expr_desc; *)
-      Vector.remove (N.equal ti) state.s_top;
-      aux () in
-  aux ();
-
-  let used_share = used_share state in
-  let tops = Vector.copy state.s_top in
-  let bij  = Stack.copy state.s_bij in
-  clear_state state;
-  Vector.iter (fun n -> ignore (add_top_expr state n.expr_desc)) tops;  
-  Stack.iter (fun (r, _) -> apply_bij state r) bij;
-  List.iter (fun e -> ignore (add_top_expr state e)) !removed;
-  
-  clear_bijection state;    
-  simplify_until_with_clear state used_share k 
-  
-   
-  
- *)
-
-
 
 (* ----------------------------------------------------------------------- *)
 
