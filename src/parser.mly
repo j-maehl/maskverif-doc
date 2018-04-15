@@ -4,9 +4,12 @@
   let parse_error loc msg = raise (ParseError (loc, msg))
 
 %}
-%token PROC INPUTS OUTPUTS SHARES RANDOMS
+%token PROC END PUBLIC INPUTS OUTPUTS SHARES RANDOMS
+%token <string>SNI NI PROBING 
+%token <string>READ_FILE READ_ILANG
 
 %token <string> IDENT
+%token <int> INT
 %token LPAREN
 %token RPAREN
 %token LBRACKET
@@ -14,15 +17,18 @@
 %token LCURLY
 %token RCURLY
 %token COMMA SEMICOLON COLON
-%token DOTEQ EQ 
+%token MARKEQ DOTEQ EQ 
+%token LSR LSL
 %token ADD MUL NOT
 %token EOF
 %left ADD
 %left MUL
 %nonassoc NOT
 
-%start prog
-%type <Parsetree.prog> prog
+%start command 
+%start file
+%type <Parsetree.command> command
+%type <Parsetree.command list> file
 
 %%
 
@@ -33,8 +39,35 @@
 ident:
   | x=loc(IDENT) { x }
 
+range1:
+  | i=INT COLON j=INT { i, j }
+  | i=INT             { i, i }
+
+range:
+  | LBRACKET r=range1 RBRACKET { r } 
+
+%inline rangen: 
+  | LBRACKET r=separated_list(COMMA,range1) RBRACKET { r }
+
+shift:
+  | LSR i=INT { Sr i }
+  | LSL i=INT { Sl i }
+
+%inline id_range:
+  | x=ident r=rangen? { x,r }
+
+id_range_decl:
+  | x=ident r=range? { x, r }
+
+%inline vcall1:
+  | x=id_range { Vid x }
+  | LBRACKET xs=loc(separated_list(COMMA,ident)) RBRACKET { Vtuple xs }
+
+%inline vcall: 
+  | x=vcall1 s=shift? { x, s }
+
 expr_r: 
-  | x=ident                  { Evar x }
+  | x=vcall               { Evar x }
   | LPAREN e=expr RPAREN     { data e }
   | e1=expr ADD e2=expr      { Eadd(e1, e2) }
   | e1=expr MUL e2=expr      { Emul(e1, e2) }
@@ -44,25 +77,24 @@ expr:
   | e=loc(expr_r)            { e }
 
 %inline assgn: 
-  | x=ident DOTEQ e=expr 
+  | x=vcall DOTEQ e=expr 
     { {i_var = x; i_kind = IK_subst; i_expr = e } }
-  | x=ident EQ e=expr  
+  | x=vcall MARKEQ e=expr  
     { {i_var = x; i_kind = IK_sub; i_expr = e } }
-  | x=ident EQ LBRACKET e=expr RBRACKET 
+  | x=vcall EQ e=expr
     { {i_var = x; i_kind = IK_glitch; i_expr = e } }
-  | x=ident EQ LCURLY e=expr RCURLY     
+  | x=vcall EQ LCURLY e=expr RCURLY     
     { {i_var = x; i_kind = IK_hide; i_expr = e } }
   
-%inline vcall:
-  | x=ident { Vid x }
-  | LBRACKET xs=loc(separated_list(COMMA,ident)) RBRACKET { Vtuple xs }
-
 %inline vcalls:
-  | x = vcall { [x] }
   | LPAREN xs=separated_list(COMMA,vcall) RPAREN { xs }
 
-%inline call:
-  | xs=vcalls EQ f=ident ys=vcalls { {i_lhs = xs; i_macro = f; i_args = ys } }
+%inline lhs:
+  | x=vcall { [x] }
+  | LPAREN xs=separated_list(COMMA,vcall) RPAREN { xs }
+
+call:
+  | xs=lhs EQ f=ident ys=vcalls { {i_lhs = xs; i_macro = f; i_args = ys } }
 
 instr: 
   | i=assgn SEMICOLON { Iassgn i }
@@ -75,7 +107,8 @@ shares:
   | xs=separated_list (ADD, ident) {xs}
 
 decl:
-  | x=ident EQ xs=shares  { (x, xs) }
+  | x=ident EQ xs=shares  { (x, Ids xs) }
+  | x=ident r=range { x, Range r }
 
 decls:
   | ds=separated_list(COMMA,decl) { ds }
@@ -89,24 +122,41 @@ outputs:
 shares_decl:
   |                      { [] }
   | SHARES COLON d=decls { d }
+
+pub_inputs:
+  |                                                     { [] }
+  | PUBLIC INPUTS d=separated_list(COMMA,id_range_decl) { d }
  
 randoms:
-  |                                             { [] }
-  | RANDOMS COLON r=separated_list(COMMA,ident) { r }
-
-fname:
-  | PROC f=ident COLON { f }
+  |                                                     { [] }
+  | RANDOMS COLON r=separated_list(COMMA,id_range_decl) { r }
 
 func:
-  | f=fname i=inputs o=outputs s=shares_decl r=randoms SEMICOLON c=cmd 
-    { {f_name=f; f_in = i; f_out = o; f_shares = s; f_rand = r; f_cmd = c } }
+  | PROC f_name=ident COLON 
+      f_pin    = pub_inputs 
+      f_in     = inputs 
+      f_out    = outputs 
+      f_shares = shares_decl 
+      f_rand   = randoms SEMICOLON
+      f_cmd    = cmd 
+    END
+    { { f_name; f_pin; f_in; f_out; f_shares; f_rand; f_cmd } }
 
-prog:
-  | fs=list(func) EOF { fs }
-  | error { parse_error (Location.make $startpos $endpos) None } 
+command1:
+  | f=func            { Func f }
+  | f=loc(NI)         { NI f }
+  | f=loc(SNI)        { SNI f }
+  | f=loc(PROBING)    { Probing f}
+  | f=loc(READ_FILE)  { Read_file f  }
+  | f=loc(READ_ILANG) { Read_ilang f }
+  | error             { parse_error (Location.make $startpos $endpos) None }
 
+command:
+  | c=command1 { c }
+  | EOF        { Exit }
 
-  
+file:
+  | c=list(command1) EOF { c }
 
 
   

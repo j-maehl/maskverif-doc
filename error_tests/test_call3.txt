@@ -1,0 +1,12 @@
+proc T:
+  inputs : a = a0 + a1
+  outputs : c = c0 + c1;
+  c0 = a0;
+  c1 = a1;
+
+proc T1:
+  inputs : a = a0 + a1 
+  outputs : c = c0 + c1;
+
+  (c,c) = T(a);
+

@@ -6,10 +6,11 @@ module List : sig
     val is_empty : 'a list -> bool
   end
 
-(* ----------------------------------------------------------------------- *)
 val partition :
   ('a -> bool) -> 'a list -> 'a list -> 'a list -> 'a list * 'a list
 
+val mk_range_i : int -> int -> int list 
+(* ----------------------------------------------------------------------- *)
 type 'a pp = Format.formatter -> 'a -> unit
 
 val pp_if    : bool -> 'a pp -> 'a pp -> 'a pp
@@ -121,3 +122,29 @@ val error :
 
 val pp_error : 
   Format.formatter -> string * Location.t option * string -> unit
+
+(* -------------------------------------------------------------------- *)
+exception ParseError of Location.t * string option
+exception LexicalError of Location.t option * string
+(* -------------------------------------------------------------------- *)
+
+type hstring = private {
+    hs_id : int;
+    hs_str : string;
+  }
+
+module HS : sig
+
+  val make : string -> hstring
+
+  type t = hstring 
+
+  val equal : t -> t -> bool
+
+  val hash : t -> int 
+
+  val compare : t -> t -> int 
+
+  val empty : t 
+end
+

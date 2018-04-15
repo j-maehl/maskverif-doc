@@ -1,6 +1,8 @@
 # --------------------------------------------------------------------
-OCB_FLAGS :=
+OCB_FLAGS := 
 MAIN      := main
+MAINPARSE := main_input
+ILANG     := ilang
 UNAME_S   := $(shell uname -s)
 
 ifeq ($(UNAME_S),Linux)
@@ -18,7 +20,7 @@ clean:
 	$(OCB) -clean; rm -f src/*~
 
 native: 
-	$(OCB) $(MAIN).native
+	$(OCB) $(MAIN).native $(MAINPARSE).native 
 
 byte:
 	$(OCB) $(MAIN).byte

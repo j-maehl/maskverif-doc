@@ -1,0 +1,44 @@
+proc OR:
+  inputs : a = a0 + a1, b = b0 + b1
+  outputs: c = c0 + c1;
+
+  c0 = [a0 + b0];
+  c1 = [a1 + b1];
+
+proc AND:
+  inputs: a = a0 + a1, b = b0 + b1
+  outputs: c = c0 + c1
+  shares : t = t0 + t1
+  randoms: r;
+
+  t0  = [a0*b1 + r];
+  t1  = [a1*b0 + r];
+  ab0 := a0*b0;
+  ab1 := a1*b1;
+  c    = OR([ab0, ab1], t);
+
+proc Ksbox:
+ inputs: a = a0 + a1, b = b0 + b1, c = c0 + c1, d = d0 + d1, e = e0 + e1
+ outputs: f = f0 + f1, g = g0 + g1, h = h0 + h1, k = k0 + k1, l = l0 + l1
+ shares : m = m0 + m1;
+
+  nb0 := !b0;
+  m   = AND(c, [nb0,b1]);
+  (f) = OR(a, m);
+ 
+  nc0 := !c0;
+  m   = AND(d,[nc0,c1]);
+  (g) = OR(b, m);
+ 
+  nd0 := !d0;
+  m   = AND(e,[nc0,d1]);
+  h   = OR(c, m);
+ 
+  ne0 := !e0;
+  m   = AND(a,[ne0,e1]);
+  k   = OR(d, m);
+ 
+  na0 := !a0;
+  m   = AND(b,[na0,a1]);
+  l   = OR(e, m);
+

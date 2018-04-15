@@ -1,9 +1,7 @@
 { 
   open Util
   open Parser
-  open Parsetree 
 
-  exception LexicalError of Location.t option * string
 
   let pp_lex_error fmt msg =
     Format.fprintf fmt "parse error: %s" msg
@@ -14,12 +12,22 @@
   let unterminated_comment () =
     raise (LexicalError (None, "unterminated comment"))
 
+  let unterminated_string () =
+    raise (LexicalError (None, "unterminated string"))
+
   let _keywords = [
     "proc"   , PROC;
+    "end"    , END;
+    "public" , PUBLIC; 
     "inputs" , INPUTS;
     "outputs", OUTPUTS;
+    "shares" , SHARES;
     "randoms", RANDOMS;
-    "shares" , SHARES
+    "NI"     , NI "";
+    "SNI"    , SNI "";
+    "Probing", PROBING "";
+    "read_file" , READ_FILE "";
+    "read_ilang", READ_ILANG ""
   ]
 
   let keywords =
@@ -45,8 +53,22 @@ let ident = char (char | digit | '\'')*
 rule main = parse
   | newline     { Lexing.new_line lexbuf; main lexbuf }
   | blank+      { main lexbuf }
-  | ident as id { try Hashtbl.find keywords id with Not_found -> IDENT id }
+  | ident as id {
+                 let token = 
+                   try Hashtbl.find keywords id with Not_found -> IDENT id in
+                 let to_string lexbuf = 
+                   Buffer.contents (read_string (Buffer.create 0) lexbuf) in
+                 match token with
+                 | NI _         -> NI (to_string lexbuf)
+                 | SNI _        -> SNI (to_string lexbuf)
+                 | PROBING _    -> PROBING (to_string lexbuf) 
+                 | READ_FILE _  -> READ_FILE (to_string lexbuf) 
+                 | READ_ILANG _ -> READ_ILANG (to_string lexbuf) 
+                 | _ -> token
+               }
+  | uint as n    { INT (int_of_string n) }
   | "(*"        { comment lexbuf; main lexbuf }
+
   | "("         { LPAREN }
   | ")"         { RPAREN }
   | "["         { LBRACKET }
@@ -57,11 +79,20 @@ rule main = parse
   | ":"         { COLON }
   | "="         { EQ }
   | ":="        { DOTEQ }
+  | "!="        { MARKEQ }
   | "+"         { ADD }
   | "*"         { MUL }
   | "!"         { NOT }
   | ";"         { SEMICOLON }
+  | ">>"        { LSR }
+  | "<<"        { LSL }
   | eof         { EOF }
+
+and read_string buf = parse 
+  | blank+        { read_string buf lexbuf }
+  | newline       { Lexing.new_line lexbuf; buf }
+  | eof           { unterminated_string () }
+  | _ as c        { Buffer.add_char buf c   ; read_string buf lexbuf }
 
 and comment = parse
   | "*)"        { () }

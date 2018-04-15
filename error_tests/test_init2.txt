@@ -1,0 +1,4 @@
+proc T:
+  inputs : a = a0 + a1
+  outputs : c = c0 + c1;
+  c0 = c0;

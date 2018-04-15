@@ -367,7 +367,7 @@ let check_all_para state maxparams (ldfs:L.ldfs) =
 
   with e -> (cleanup (); raise e)
 
-let check_ni params nb_shares all =
+let check_ni ?(fname="") params nb_shares all =
   try 
     let len = List.length all in
     let state = init_state nb_shares params in
@@ -375,9 +375,9 @@ let check_ni params nb_shares all =
     let all = List.map (fun e -> e, e) all in
     let args = L.cons order all len [] in
     check_all state order args;
-    Format.printf "NI@."
+    Format.printf "%s is NI@." fname 
   with CanNotCheck le ->
-    Format.eprintf "%a@." print_error le
+    Format.eprintf "@[<v>In %s:@ %a@]@." fname print_error le
 
 let check_fni ?(para = false) s f params nb_shares interns outs =
   try 
@@ -387,14 +387,14 @@ let check_fni ?(para = false) s f params nb_shares interns outs =
     let order = nb_shares - 1 in 
     let interns = List.map (fun e -> e, e) interns in
     let outs = List.map (fun e -> e, e) outs in 
-    for ki = 0 to (*nb_shares - 1*) (nb_shares-1)/2 (* FIXME *) do
+    for ki = 0 to order do
       let ko = order - ki in
       Format.eprintf "Start checking of ki = %i, ko = %i@." ki ko;
       (if ki <= len_i && ko <= len_o then
          let args = if ko = 0 then [] else L.cons ko outs len_o [] in
          let args = if ki = 0 then args else L.cons ki interns len_i args in
          (if para then check_all_para else check_all) state (f ki ko) args);
-      Format.eprintf "Checking of done ki = %i, ko = %i@." ki ko;
+      Format.eprintf "Checking of ki = %i, ko = %i done@." ki ko;
     done;
     Format.printf "%s@." s
   with CanNotCheck le ->
@@ -411,7 +411,7 @@ let mk_interns outs =
         if not (Se.mem e souts) then Se.add e interns else interns in
       match e.e_node with
       | Eadd(e1,e2) | Emul(e1,e2) -> aux (aux interns e1) e2
-      | Etuple(_, es) -> Array.fold_left aux interns es
+      | Eop(_,_, es) -> Array.fold_left aux interns es
       | _ -> interns 
     else interns in
   let interns = List.fold_left aux Se.empty outs in

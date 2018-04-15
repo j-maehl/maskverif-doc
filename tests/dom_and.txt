@@ -1,0 +1,2 @@
+read_ilang tests/dom_and.ilang
+NI \dom_and

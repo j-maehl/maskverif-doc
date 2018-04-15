@@ -1,0 +1,2 @@
+read_ilang tests/keccak_sbox.ilang
+NI \keccak_sbox

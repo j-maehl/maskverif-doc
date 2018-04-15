@@ -1,0 +1,7 @@
+inputs: a = a0 + a1, b = b0 + b1
+outputs: c = c0 + c1
+randoms: r;
+
+c0 = a0*b0 + r
+t = [r + a0*b1] 
+c1 = a1*b1 + t + a1*b0

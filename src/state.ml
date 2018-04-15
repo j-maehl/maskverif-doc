@@ -15,11 +15,12 @@ and descriptor =
 | Top
 | Rnd   of rnd 
 | Share of param * int 
+| Pub   of var 
 | Neg   of node 
 | Add   of node * node
 | Mul   of node * node
-| Tuple of bool * node array
-  (* Invariant [Tuple(b,ns)]
+| Tuple of bool * operator * node array
+  (* Invariant [Tuple(b,o,ns)]
        if [b] is true there is no duplicate in the array [ns] *)
 
 module N = struct 
@@ -61,11 +62,12 @@ let pp_descriptor fmt = function
   | Top        -> Format.fprintf fmt "TOP"
   | Rnd i      -> pp_rnd fmt i
   | Share (p,i)-> pp_share fmt (p,i)
+  | Pub x      -> pp_var fmt x
   | Neg e      -> Format.fprintf fmt "!%i" e.node_id
   | Add(e1,e2) -> Format.fprintf fmt "%i + %i" e1.node_id e2.node_id
   | Mul(e1,e2) -> Format.fprintf fmt "%i * %i" e1.node_id e2.node_id
-  | Tuple(_,es)->
-    Format.fprintf fmt "(@[%a@])" 
+  | Tuple(_,o,es)->
+    Format.fprintf fmt "%s(@[%a@])" o.hs_str
       (pp_list "@, "(fun fmt e -> Format.fprintf fmt "%i" e.node_id)) 
       (Array.to_list es)
     
@@ -230,12 +232,13 @@ let set_parents state n =
   match n.descriptor with
   | Rnd _   -> ()
   | Share _ -> ()
+  | Pub _   -> ()
   | Top     -> ()
   | Neg p   -> add_children state p n 
   | Add(p1,p2) | Mul(p1,p2) -> 
     add_children state p1 n;
     if not (N.equal p1 p2) then add_children state p2 n
-  | Tuple(b, ps) ->
+  | Tuple(b, _o, ps) ->
     if b then (* No duplicate *)
       for i = 0 to Array.length ps - 1 do
         add_children state ps.(i) n
@@ -248,9 +251,6 @@ let set_parents state n =
           (Hn.add tbl p (); add_children state p n)
       done
       
-    
-
-
 let rec add_expr state e = 
   try He.find state.s_hash e 
   with Not_found ->
@@ -259,6 +259,7 @@ let rec add_expr state e =
       | Etop         -> assert false 
       | Ernd r       -> Rnd r
       | Eshare(p, i) -> Share(p,i)
+      | Epub x       -> Pub x
       | Eneg e       -> 
         let n = add_expr state e in
         Neg n
@@ -270,9 +271,9 @@ let rec add_expr state e =
         let n1 = add_expr state e1 in
         let n2 = add_expr state e2 in
         Mul(n1,n2)
-      | Etuple(b, es) ->
+      | Eop(b, o, es) ->
         let ns = Array.map (add_expr state) es in
-        Tuple(b, ns)
+        Tuple(b, o, ns)
     in
     let n = 
       { node_id    = Count.next state.s_count;
@@ -311,11 +312,12 @@ and remove_node state n =
   | Top   -> assert false 
   | Rnd _ -> ()
   | Share(a,_) -> rm_used_share state a 
+  | Pub _ -> ()
   | Neg p -> remove_child state p n
   | Add(p1,p2) | Mul(p1,p2) ->
     remove_child state p1 n;
     remove_child state p2 n
-  | Tuple(_,ps) ->
+  | Tuple(_, _o, ps) ->
     for i = 0 to Array.length ps - 1 do
       remove_child state ps.(i) n
     done
@@ -393,10 +395,11 @@ let simplified_expr state =
         | Top        -> top
         | Rnd r      -> rnd r
         | Share(p,i) -> share p i
+        | Pub x      -> pub x
         | Neg n      -> neg (aux n)
         | Add(n1,n2) -> add (aux n1) (aux n2)
         | Mul(n1,n2) -> mul (aux n1) (aux n2) 
-        | Tuple(b, ns) -> unsafe_tuple b (Array.map aux ns)
+        | Tuple(b, o, ns) -> unsafe_op b o (Array.map aux ns)
       in
       Hn.add tbl n e;
       e in

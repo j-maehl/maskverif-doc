@@ -1,4 +1,5 @@
 open Util
+
 type var = {
   v_id   : int;
   v_name : string;
@@ -52,6 +53,8 @@ let pp_share fmt (p,s) = Format.fprintf fmt "%a%i" pp_var p s
 
 (* ----------------------------------------------------------------------- *)
 
+type operator = hstring 
+
 type expr = {
   e_id : int;
   e_node : expr_node}
@@ -60,11 +63,12 @@ and expr_node =
 | Etop
 | Ernd   of rnd
 | Eshare of param * int
+| Epub   of var 
 | Eneg   of expr
 | Eadd   of expr * expr
 | Emul   of expr * expr
-| Etuple of bool * expr array
-  (* Invariant [Etuple(b,es)]
+| Eop of bool * operator * expr array
+  (* Invariant [Eop(b,es)]
        if b is true there is no duplicate in the array es *)
 
 let e_equal e1 e2 = e1 == e2
@@ -79,11 +83,12 @@ module HE = struct
     | Etop         , Etop          -> true
     | Ernd r1      , Ernd r2       -> V.equal r1 r2
     | Eshare(p1,i1), Eshare(p2,i2) -> i1 == i2 && V.equal p1 p2
+    | Epub x1      , Epub x2       -> V.equal x1 x2 
     | Eneg e1      , Eneg e2       -> e_equal e1 e2
     | Eadd(e11,e12), Eadd(e21,e22) -> e_equal e11 e21 && e_equal e12 e22
     | Emul(e11,e12), Emul(e21,e22) -> e_equal e11 e21 && e_equal e12 e22
-    | Etuple(b1,es1), Etuple(b2,es2) -> 
-      b1 = b2 && Array.for_all2 e_equal es1 es2
+    | Eop(b1,o1,es1), Eop(b2,o2,es2) -> 
+      b1 = b2 && HS.equal o1 o2 && Array.for_all2 e_equal es1 es2
     | _                            -> false
 
   let equal e1 e2 = equal_node e1.e_node e2.e_node 
@@ -95,12 +100,14 @@ module HE = struct
     | Etop        -> 0
     | Ernd r      -> combine (V.hash r) 1
     | Eshare(p,i) -> combine2 (V.hash p) i 2
-    | Eneg e1     -> combine (e_hash e1) 3 
-    | Eadd(e1,e2) -> combine2 (e_hash e1) (e_hash e2) 4
-    | Emul(e1,e2) -> combine2 (e_hash e1) (e_hash e2) 5 
-    | Etuple(_b,es)   -> 
-      let h = Array.fold_left (fun h e -> combine h (e_hash e)) 0 es in
-      combine h 6
+    | Epub x      -> combine (V.hash x) 3
+    | Eneg e1     -> combine (e_hash e1) 4 
+    | Eadd(e1,e2) -> combine2 (e_hash e1) (e_hash e2) 5
+    | Emul(e1,e2) -> combine2 (e_hash e1) (e_hash e2) 6 
+    | Eop(_b,o,es)   -> 
+      let h = 
+        Array.fold_left (fun h e -> combine h (e_hash e)) (HS.hash o) es in
+      combine h 7
 
   let hash e = hash_node e.e_node
 
@@ -139,24 +146,31 @@ module Me = Map.Make(E)
 
 let top       = E.mk_expr Etop
 let rnd r     = E.mk_expr (Ernd r)
+let pub x     = E.mk_expr (Epub x) 
 let share p i = E.mk_expr (Eshare(p,i))
 let neg e     = E.mk_expr (Eneg e)
 let add e1 e2 = E.mk_expr (Eadd(e1,e2))
 let mul e1 e2 = E.mk_expr (Emul(e1,e2))
 
-let unsafe_tuple b es = E.mk_expr (Etuple(b,es))
+let unsafe_op b o es = E.mk_expr (Eop(b,o,es))
 
-let tuple_nodup es = E.mk_expr (Etuple(true,es))
+let op_nodup o es = E.mk_expr (Eop(true,o, es))
 
-let tuple es  =
+let op o es  =
   let n = Array.length es in
   let tbl = He.create (2 * n) in
-  let rec check i = 
+  let rec check i =
     n <= i || 
       (not (He.mem tbl es.(i)) &&
          (He.add tbl es.(i) ();check (i+1))) in
   let b = check 0 in
-  E.mk_expr (Etuple(b,es))
+  unsafe_op b o es 
+
+let is_op_tuple o = HS.equal o HS.empty
+
+let tuple_nodup es = op_nodup HS.empty es
+
+let tuple es = op HS.empty es
   
 (* --------------------------------------------------------------------- *)
 let pp_expr fmt e =
@@ -165,6 +179,7 @@ let pp_expr fmt e =
     | Etop        -> Format.fprintf fmt "TOP"
     | Ernd r      -> pp_rnd fmt r
     | Eshare(p,i) -> pp_share fmt (p,i)
+    | Epub x      -> pp_var fmt x
     | Eneg e      -> 
       Format.fprintf fmt "!%a" (aux `Not) e
     | Eadd(e1,e2) -> 
@@ -177,11 +192,14 @@ let pp_expr fmt e =
     | Emul(e1,e2) -> 
       begin match top with
       | `MulR | `Not -> 
-        Format.fprintf fmt "(%a.%a)" (aux `MulL) e1 (aux `MulR) e2
+        Format.fprintf fmt "(%a * %a)" (aux `MulL) e1 (aux `MulR) e2
       | _ ->
-        Format.fprintf fmt "%a.%a" (aux `MulL) e1 (aux `MulR) e2
+        Format.fprintf fmt "%a * %a" (aux `MulL) e1 (aux `MulR) e2
       end 
-    | Etuple(_, es) ->
-      Format.fprintf fmt "(@[<hov 2>%a@])" 
-         (pp_list ",@ " (aux `Top)) (Array.to_list es) in
+    | Eop(_, o, es) ->
+      if Array.length es <> 0 then
+        Format.fprintf fmt "%s(@[<hov 2>%a@])" o.hs_str
+          (pp_list ",@ " (aux `Top)) (Array.to_list es) 
+      else 
+        Format.fprintf fmt "%s" o.hs_str in
   aux `Top fmt e

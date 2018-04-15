@@ -5,7 +5,8 @@ true : -traverse
 
 # --------------------------------------------------------------------
 <src>   : include
-<src/*> : package(zarith,unix)
+<src/*> : package(zarith,unix,menhirLib,ocamlgraph)
 
 <src/main.byte>   : linkdep(src/shrcnt_low.o), custom
-<src/main.native> : linkdep(src/shrcnt_low.o)
+<src/*.native>    : linkdep(src/shrcnt_low.o)
+

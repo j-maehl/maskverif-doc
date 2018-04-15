@@ -22,6 +22,14 @@ let rec partition f lin lout l =
     if f e then partition f (e::lin) lout l
     else partition f lin (e::lout) l
 
+let mk_range_i i j = 
+  let i1,j1 = if i <= j then i,j else j,i in
+  let l = ref [] in
+  for k = j1 downto i1 do
+    l := k :: !l 
+  done;
+  if i <= j then !l else List.rev !l
+
 (* ----------------------------------------------------------------------- *)
 type 'a pp = Format.formatter -> 'a -> unit
 
@@ -74,9 +82,11 @@ module Array = struct
     aux (length t - 1)
 
   let for_all2 f t1 t2 =
-    Array.length t1 = Array.length t2 &&
-      let rec aux i = f t1.(i) t2.(i) && (i = 0 || aux (i-1)) in
-      aux (length t1 - 1)
+    let n1 = length t1 in
+    n1 = length t2 &&
+      (n1 = 0 ||
+         let rec aux i = f t1.(i) t2.(i) && (i = 0 || aux (i-1)) in
+         aux (n1 - 1))
 end 
 
 let finally final f a =
@@ -292,7 +302,7 @@ let warning ?loc fmt =
   Format.kfprintf (fun _ ->
     Format.pp_print_flush bfmt ();
     let msg = Buffer.contents buf in
-    Format.eprintf "Warning %s: %s" loc msg) bfmt fmt
+    Format.eprintf "Warning %s: %s@." loc msg) bfmt fmt
 
 exception Error of (string * Location.t option * string)
 
@@ -310,6 +320,41 @@ let pp_error fmt (s,loc,msg) =
     | None -> ()
     | Some loc -> Format.fprintf fmt " at %s" (Location.to_string loc) in
   Format.fprintf fmt "%s%a: %s" s pp_loc loc msg
+
+(* -------------------------------------------------------------------- *)
+exception ParseError of Location.t * string option
+exception LexicalError of Location.t option * string
+
+(* -------------------------------------------------------------------- *)
+type hstring = {
+    hs_id : int;
+    hs_str : string;
+  }
+
+module HS = struct 
+  let id = ref 0
+
+  let tbl = Hashtbl.create 100 
+
+  let make s =
+    try Hashtbl.find tbl s 
+    with Not_found ->
+      let p = { hs_id = !id; hs_str = s } in
+      incr id;
+      Hashtbl.add tbl s p;
+      p 
+
+  type t = hstring 
+
+  let equal s1 s2 = s1 == s2
+
+  let hash s = s.hs_id
+
+  let compare s1 s2 = s1.hs_id - s2.hs_id
+
+  let empty = make ""
+
+end
 
   
       
