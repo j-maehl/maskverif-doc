@@ -521,7 +521,11 @@ let rec expr_of_pexpr e =
     E.op o (Array.of_list (List.map expr_of_pexpr es))
   | Ebox e      -> e
 
-let subst_v s x = try E.Hv.find s x with Not_found -> assert false
+let subst_v s x = 
+  try E.Hv.find s x 
+  with Not_found -> 
+    Format.eprintf "Can not find %a@." (pp_var true) x;
+    assert false
 
 let rec subst_e s e = 
   match e with
@@ -613,8 +617,8 @@ let sub_array es1 es2 =
   
 let remove_subtuple obs = 
   let obs = E.Se.elements obs in
-  Format.printf "remove_subtuple: @[<v>%a@]@." (pp_list "@ " E.pp_expr) obs;
-
+(*  Format.printf "@[<v>possible observations:@ %a@]@." 
+    (pp_list "@ " E.pp_expr) obs; *)
   let cmp e1 e2 = 
     match e1.E.e_node, e2.E.e_node with
     | E.Eop(_,o1,es1), E.Eop(_,o2,es2) 
@@ -670,7 +674,8 @@ let build_obs_func ~ni loc f =
     let xs = check_shares xs in
     let mk_param i xi = 
       let p = E.share x i in
-      obs := E.Se.add p !obs;
+      if ni <> `Threshold then 
+        obs := E.Se.add p !obs;
       add_subst xi p in
     Array.iteri mk_param xs;
     x
@@ -691,6 +696,7 @@ let build_obs_func ~ni loc f =
 
   let interns, out = 
     match ni with
+    | `Threshold -> obs, []
     | `NI -> obs, []
     | `SNI -> 
       (* Compute the set of output *)
@@ -713,5 +719,43 @@ let build_obs_func ~ni loc f =
    *)
   let interns = remove_subtuple interns in
   (params, !nb_shares, interns, out) 
- 
+
+
+(* --------------------------------------------------------------- *)
+let threshold func =
+  let init = ref [] in
+  let rnds = ref [] in
+  let mk_rnd x =
+    let r = E.V.clone x in
+    rnds := r :: !rnds;
+    let i = { i_var = x;
+              i_kind = P.IK_subst;
+              i_expr = Evar r } in
+    init := Iassgn i :: !init;
+    Evar x in
+  let mk_shared x0 x es =
+    let i =
+      {i_var = x0;
+       i_kind = P.IK_hide;
+       i_expr = List.fold_left (fun e1 e2 -> Eadd(e1, e2)) (Evar x) es} in
+    init := Iassgn i :: !init in
+  let init_input (x,xs) = 
+    match xs with
+    | [] -> assert false
+    | x0::xs ->
+      let es = List.map mk_rnd xs in
+      let x' = E.V.clone x in
+      mk_shared x0 x' es;
+      (x,[x']) in
+  let f_in = List.map init_input func.f_in in
+  { func with 
+    f_name = E.V.mk_var (func.f_name.E.v_name ^ "_threshold");
+    f_in;
+    f_rand = List.rev_append !rnds func.f_rand;
+    f_cmd  = List.rev_append !init func.f_cmd }
+    
+
+  
+
+      
  

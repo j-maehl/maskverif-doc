@@ -3,10 +3,22 @@ autoidx 183
 attribute \top 1
 attribute \src "keccak_sbox.v:32"
 module \keccak_sbox
+##public \ClkxCI \EnablexSI \IotaRCxDI \RstxRBI
+##random \ZxDI
+##input : a \InputxDI [0 5] 
+##input : b \InputxDI [1 6] 
+##input : c \InputxDI [2 7] 
+##input : d \InputxDI [3 8] 
+##input : e \InputxDI [4 9] 
+##output \OutputxDO [0 5] 
+##output \OutputxDO [1 6] 
+##output \OutputxDO [2 7] 
+##output \OutputxDO [3 8] 
+##output \OutputxDO [4 9] 
   attribute \src "keccak_sbox.v:34"
-  wire public input 1 \ClkxCI
+  wire input 1 \ClkxCI
   attribute \src "keccak_sbox.v:34"
-  wire public input 3 \EnablexSI
+  wire input 3 \EnablexSI
   attribute \src "keccak_sbox.v:38"
   wire width 10 \FFxDN
   attribute \src "keccak_sbox.v:39"
@@ -142,13 +154,13 @@ module \keccak_sbox
   attribute \unused_bits "0"
   wire \FFxDP_reg[9].sena
   attribute \src "keccak_sbox.v:35"
-  wire width 10 input 5 shares 2 5 \InputxDI
+  wire width 10 input 5 \InputxDI       
   attribute \src "keccak_sbox.v:34"
-  wire public input 4 \IotaRCxDI
+  wire input 4 \IotaRCxDI
   attribute \src "keccak_sbox.v:37"
-  wire width 10 output 7 shares 2 5 \OutputxDO
+  wire width 10 output 7 \OutputxDO
   attribute \src "keccak_sbox.v:34"
-  wire public input 2 \RstxRBI
+  wire input 2 \RstxRBI
   attribute \src "keccak_sbox.v:44"
   wire \SBOX.result[0]
   attribute \src "keccak_sbox.v:56"
@@ -160,7 +172,7 @@ module \keccak_sbox
   attribute \src "keccak_sbox.v:92"
   wire \SBOX.result[0]_89
   attribute \src "keccak_sbox.v:36"
-  wire width 5 random input 6 \ZxDI
+  wire width 5 input 6 \ZxDI
   attribute \src "keccak_sbox.v:7"
   wire \mux_FFxDP_114_10.ctl
   attribute \src "keccak_sbox.v:169"

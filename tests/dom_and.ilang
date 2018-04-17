@@ -3,9 +3,15 @@ autoidx 90
 attribute \top 1
 attribute \src "dom_and.v:20"
 module \dom_and
+  ## public \ClkxCI \RstxBI
+  ## input \XxDI
+  ## input \YxDI
+  ## output \QxDO
+  ## random \ZxDI  
+ 
   wire $techmap\FFxDP_reg[0].$auto$proc_dff.cc:124:gen_dffsr_complex$33
   attribute \src "dom_and.v:21"
-  wire public input 1 \ClkxCI
+  wire input 1 \ClkxCI
   attribute \src "dom_and.v:25"
   wire width 4 \FFxDP
   attribute \src "dom_and.v:52"
@@ -37,7 +43,7 @@ module \dom_and
   attribute \src "dom_and.v:24"
   wire width 2 output 6 \QxDO
   attribute \src "dom_and.v:21"
-  wire public input 2 \RstxBI
+  wire input 2 \RstxBI
   attribute \src "dom_and.v:30"
   wire \Xi_mul_Yj
   attribute \src "dom_and.v:31"
@@ -51,7 +57,7 @@ module \dom_and
   attribute \src "dom_and.v:22"
   wire width 2 input 4 \YxDI
   attribute \src "dom_and.v:23"
-  wire random input 5 \ZxDI
+  wire input 5 \ZxDI
   attribute \src "dom_and.v:90"
   wire \mux_FFxDP_78_15.g1.inv_sel0
   attribute \src "dom_and.v:90"

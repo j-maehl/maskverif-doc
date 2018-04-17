@@ -66,19 +66,17 @@ type instr = {
     i_args : arg list
   } 
 
-type wire_decl = string * int 
-
-type shares_by = int * int 
-
 type ilang_module = {    
-  ilm_name    : string;  
-  ilm_randoms : wire_decl list;
-  ilm_publics : wire_decl list;
-  ilm_inputs  : (wire_decl * shares_by) list;
-  ilm_outputs : (wire_decl * shares_by) list;
-  ilm_others  : wire_decl list;
-  ilm_cmd     : instr list;
+  ilm_name     : string;  
+  ilm_randoms  : var list;
+  ilm_publics  : var list;
+  ilm_inputs   : (string option * var list) list;
+  ilm_outputs  : (var list) list;
+  ilm_others   : var list;
+  ilm_cmd      : instr list;
   }
+
+(* ----------------------------------------------------------- *)
 
 let pp_vident fmt i = 
   Format.fprintf fmt "%s" i
@@ -97,87 +95,24 @@ let pp_arg fmt = function
 let pp_instr fmt i = 
   match i.i_op, i.i_args with
   | Oid, [a1] ->
-    Format.fprintf fmt "%a := %a" pp_var i.i_dest pp_arg a1
+    Format.fprintf fmt "%a = %a" pp_var i.i_dest pp_arg a1
   | Onot, [a1] ->
-    Format.fprintf fmt "%a := !%a;" pp_var i.i_dest pp_arg a1
+    Format.fprintf fmt "%a = ~%a;" pp_var i.i_dest pp_arg a1
   | Oand, [a1;a2] -> 
-    Format.fprintf fmt "%a := %a * %a;"
+    Format.fprintf fmt "%a = %a * %a;"
       pp_var i.i_dest pp_arg a1 pp_arg a2
   | Oxor, [a1;a2] -> 
-    Format.fprintf fmt "%a := %a + %a;" 
+    Format.fprintf fmt "%a = %a + %a;" 
       pp_var i.i_dest pp_arg a1 pp_arg a2
   | Off, es ->
     Format.fprintf fmt "%a = #FF(@[%a@])" 
       pp_var i.i_dest (pp_list ",@ " pp_arg) es
   | _, _ -> assert false 
  
-let pp_cmd fmt c = 
-  Format.fprintf fmt "@[<v>%a@]" (pp_list "@ " pp_instr) c
-
-let pp_module fmt m = 
-   let pp_decls pp_decl s fmt = 
-    Format.fprintf fmt "%s @[%a@]" s (pp_list ",@ " pp_decl) in
-   let pp_decl fmt (x,i) = 
-     if i = 1 then Format.fprintf fmt "%s" x 
-     else Format.fprintf fmt "%s [%i]" x i in
-   let pp_shared fmt ((x,i),(nb,nby)) = 
-     Format.fprintf fmt "%s [%i] shares %i %i" x i nb nby in
-   Format.fprintf fmt "@[<v>proc %s:@   @[<v>%a@ %a@ %a@ %a@ %a@ %a;@ @ @ %a@]@]"
-     m.ilm_name 
-     (pp_decls pp_decl   "publics:") m.ilm_publics
-     (pp_decls pp_shared "inputs :") m.ilm_inputs
-     (pp_decls pp_shared "outputs:") m.ilm_outputs
-     (pp_decls pp_decl   "randoms:") m.ilm_randoms
-     (pp_decls pp_decl   "others :") m.ilm_others
-    pp_cmd m.ilm_cmd
-
 (* ----------------------------------------------------------------------- *)
 
 module Process = struct 
 
-  type wire_kind = 
-    | Random of int
-    | Public of int 
-    | Input  of (int * shares_by)
-    | Output of (int * shares_by)
-    | Other 
-
-  type wire = { 
-      w_kind  : wire_kind;   
-      w_name  : string;
-      w_width : int; 
-    }
-    
-  let mk_shared w (i,sh) = 
-    match sh with
-    | None    -> i, (w,1)
-    | Some (nb,iby) -> 
-      if nb*iby <> w then error "ilang:" None "invalid share declaration";
-      i,(nb,iby)
-
-  let rec get_wkind w wo = 
-    match wo with
-    | [] -> Other
-    | WO_random i :: _ -> Random i
-    | WO_input  i :: _ -> Input  (mk_shared w i)
-    | WO_output i :: _ -> Output (mk_shared w i)
-    | WO_public i :: _ -> Public i
-    | _ :: wo          -> get_wkind w wo
-                        
-  let rec get_wwidth wo = 
-    match wo with
-    | []              -> 1
-    | WO_width i :: _ -> i
-    | _ :: wo         -> get_wwidth wo
-                       
-  let process_wire (o,id) = 
-    let w_width = get_wwidth o in
-    {
-      w_kind = get_wkind w_width o;
-      w_name = data id;
-      w_width;
-    }
- 
   module G = Graph.Pack.Digraph
 
   module Hv = Hashtbl.Make(G.V)
@@ -216,17 +151,23 @@ module Process = struct
       vtbl : vertex_kind Hv.t;
       itbl : (var,G.V.t) Hashtbl.t;
       graph : G.t;
-      mutable randoms : wire list;
-      mutable publics : wire list;
-      mutable inputs  : wire list;
-      mutable outputs : wire list;
-      mutable others  : wire list;
+      wire  : (string, int) Hashtbl.t;
+      mutable winputs  : string list;
+      mutable woutputs : string list;
+      mutable randoms: var list;
+      mutable publics: var list;
+      mutable inputs : (string option * var list) list;
+      mutable outputs: (var list) list;
+      mutable others : var list;
     }
-           
+
   let empty_env () = {
       vtbl = Hv.create 1007;
       itbl = Hashtbl.create 1007;
       graph = G.create ~size:1007 ();
+      wire = Hashtbl.create 1007;
+      winputs  = [];
+      woutputs = [];
       randoms = [];
       publics = [];
       inputs  = [];
@@ -234,52 +175,148 @@ module Process = struct
       others  = [];
     }
 
+  type wire_kind = 
+    | Kinput  
+    | Koutput 
+    | Kother 
+
+  let rec get_kind wo = 
+    match wo with
+    | [] -> Kother
+    | WO_input  _ :: _ -> Kinput  
+    | WO_output _ :: _ -> Koutput 
+    | _ :: wo          -> get_kind wo 
+
+  let rec get_width wo = 
+    match wo with
+    | []              -> 1
+    | WO_width i :: _ -> i
+    | _ :: wo         -> get_width wo
+
   let create_vertex env = 
     let v = G.V.create 0 in
     G.add_vertex env.graph v;
     v
 
-  let add_wire env x = 
+  let add_input env x = 
     let v = create_vertex env in
     Hv.add env.vtbl v (Vwire x);
     Hashtbl.add env.itbl x v
 
-  let add_wires env x width = 
-    if width = 1 then add_wire env (x, None)
-    else 
-      for i = 0 to width - 1 do 
-        add_wire env (x, Some i) 
-      done
+  let process_wire env md = 
+    match md.wa_data with
+    | Wire (wo, x) ->
+      let width = get_width wo in
+      let s = data x in
+      Hashtbl.add env.wire s width; 
+      begin match get_kind wo with
+      | Kinput  -> 
+        if width = 1 then add_input env (s, None)
+        else
+          for i = 0 to width-1 do
+            add_input env (s, Some i)
+          done;
+        env.winputs  <- s :: env.winputs
+      | Koutput -> env.woutputs <- s :: env.woutputs
+      | Kother -> 
+        if width = 1 then 
+          env.others <- (s, None) :: env.others
+        else
+          for i = 0 to width-1 do
+            env.others <- (s, Some i) :: env.others
+          done
+      end
+    | _ -> ()
 
-  let add_random env w = 
-    env.randoms <- w::env.randoms;
-    add_wires env w.w_name w.w_width
+  let ilang_error loc = error "ilang" (Some loc)
 
-  let add_public env w = 
-    env.publics <- w::env.publics;
-    add_wires env w.w_name w.w_width
+   let getw_width env x = 
+     try Hashtbl.find env.wire (data x) 
+     with Not_found -> ilang_error (loc x) "undeclared wire %s" (data x)
 
-  let add_input env w = 
-    env.inputs <- w::env.inputs;
-    add_wires env w.w_name w.w_width
+   let mk_var env (x,i) =
+     let width = getw_width env x in
+     let i = 
+       match i with
+       | None -> 
+         if width <> 1 then 
+           ilang_error (loc x) "%s has size %i" (data x) width;
+         None
+       | Some i -> 
+         if not (0 <= i && i < width) then
+           ilang_error (loc x) "invalid index for %s" (data x);
+         if width = 1 then None
+         else Some i in
+     (data x, i)
+     
+   let mk_shares env = function
+     | Sident x -> 
+       let width = getw_width env x in
+       let s = data x in
+       List.map (fun i -> s, Some i) (mk_range_i 0 (width-1))
+       
+     | Sindex (x,i,j) ->
+       let width = getw_width env x in
+       let s = data x in
+       if not (0 <= i && i < width && 0 <= j && j < width) then
+         ilang_error (loc x) "invalid range for %s" s;
+       List.map (fun i -> s, Some i) (mk_range_i i j)
+     | Svindex (x, ns) ->
+       List.map (fun i -> mk_var env (x,Some i)) ns
+     | Svect xs -> 
+       List.map (mk_var env) xs
 
-  let add_output env w = 
-    env.outputs <- w::env.outputs
-    
-  let add_other env w = 
-    env.others <- w::env.others
+   let mk_param x sh = 
+     match x with
+     | Some x -> Some (data x)
+     | None ->
+       match sh with
+       | Sident x -> Some (data x)
+       | _        -> None 
+     
+   let process_random env (x,i) =
+     let s = data x in 
+     if i = None then 
+       let width = getw_width env x in
+       if width = 1 then
+         env.randoms <- (s, None) :: env.randoms
+       else
+         for i = 0 to width-1 do 
+           env.randoms <- (s, Some i) :: env.randoms
+         done
+     else env.randoms <- mk_var env (x,i) :: env.randoms
 
-  let mk_var (x,i) = data x, i 
+   let process_public env (x,i) =
+     let s = data x in 
+     if i = None then 
+       let width = getw_width env x in
+       if width = 1 then
+         env.publics <- (s, None) :: env.publics
+       else
+         for i = 0 to width-1 do 
+           env.publics <- (s, Some i) :: env.publics
+         done
+     else env.publics <- mk_var env (x,i) :: env.publics
 
-  let mk_arg = function
-    | Eid x    -> Avar (mk_var x)
+   let process_decl env = function
+     | Input (x,sh) ->
+       env.inputs <- (mk_param x sh, mk_shares env sh) :: env.inputs
+     | Output sh ->
+       env.outputs <- mk_shares env sh :: env.outputs
+     | Random xs ->
+       List.iter (process_random env) xs
+     | Public xs ->
+       List.iter (process_public env) xs 
+     
+  let mk_arg env = function
+    | Eid x    -> Avar (mk_var env x)
     | Econst s -> Aconst s
 
-  let mk_instr c = 
+  let mk_instr env c = 
     let od = operator_desc c.cell_name1 in
     let process_arg s = 
       let c = List.find (fun c -> data c.c_connect_lhs = s) c.cell_connect in
-      mk_arg c.c_connect_rhs in
+      mk_arg env c.c_connect_rhs in
     let i_args = List.map process_arg od.o_input in
     let i_dest =
       match process_arg od.o_output with
@@ -293,40 +330,48 @@ module Process = struct
     Hv.add env.vtbl v (Vinstr i);
     Hashtbl.add env.itbl i.i_dest v
   
-  let process_cell env c = add_instr env (mk_instr c)
+  let process_cell env c = add_instr env (mk_instr env c)
   
   let process_connect env c = 
-    let doit (x, e) = 
-      add_instr env { i_dest = mk_var x; i_op = Oid; i_args = [mk_arg e] } in
-    match c.connect_lhs, c.connect_rhs with
-    | (x,r), Rvect es ->
-      let rng = 
-        match r with
-        | Some (i,j) -> mk_range_i i j
-        | None -> mk_range_i (List.length es - 1) 0 in
-      let xs = List.map (fun i -> x, Some i) rng in
-      let xes = List.map2 (fun x e -> x,e) xs es in
-      List.iter doit xes
-    | (x,None), Rexpr e ->
-      doit ((x,None),e)    
-    | _, _ -> assert false 
+    let do_v x = 
+      let s = data x in
+      let w = getw_width env x in
+      if w = 1 then [s ,None]
+      else 
+        List.map (fun i -> s, Some i) (mk_range_i (w-1) 0) in
+
+    let (x,r) = c.connect_lhs in
+    let xs = 
+      match r with
+      | Some(i,j) -> List.map (fun i -> mk_var env (x,Some i)) (mk_range_i i j)
+      | None -> do_v x in
+        
+    let es =
+      let mk_e = function
+        | Eid (x,None) -> List.map (fun x -> Avar x) (do_v x)
+        | e -> [mk_arg env e] in
+      match c.connect_rhs with
+      | Rexpr e -> mk_e e 
+      | Rvect es -> List.flatten (List.map mk_e es) in
+    
+    let n1 = List.length xs in
+    let n2 = List.length es in
+    if n1 <> n2 then
+      ilang_error (loc x) "invalid size for connect (lhs:%i, rhs: %i)" n1 n2;
+    let doi x e = add_instr env { i_dest = x; i_op = Oid; i_args = [e] } in
+    List.iter2 doi xs es
 
   let process_module m = 
     let env = empty_env () in
-    (* initialize the graph *)
-    let process_wire w =
-      let w = process_wire w in
-      match w.w_kind with 
-      | Random _ -> add_random env w
-      | Public _ -> add_public env w 
-      | Input  _ -> add_input  env w
-      | Output _ -> add_output env w 
-      | Other    -> add_other  env w in
+    (* initialize the wire *)
+    List.iter (process_wire env) m.mod_decl;
+    (* process the other declarations, and build the graph *)
     let process_decl md = 
       match md.wa_data with 
-      | Wire w    -> process_wire w
+      | Wire _    -> () 
       | Cell c    -> process_cell env c
-      | Connect c -> process_connect env c in
+      | Connect c -> process_connect env c
+      | Decl d    -> process_decl env d in
     List.iter process_decl m.mod_decl;
     (* add edges *) 
     let add_edge v2 = function
@@ -349,31 +394,47 @@ module Process = struct
       | Vinstr i -> i::c in
     let c = G.Topological.fold doit env.graph [] in
 
-    (* build the input *)
-    let get_kind w = 
-      match w.w_kind with
-      | Public i | Input (i,_) | Output (i,_) | Random i -> i
-      | Other -> 0 in
-    let get_share w = 
-      match w.w_kind with
-      | Input (_,sh) | Output (_,sh) -> sh 
-      | _ -> assert false in
-    let sort = List.sort (fun w1 w2 -> get_kind w1 - get_kind w2) in
-    let decls = List.map (fun w -> w.w_name, w.w_width) in
-    let decls_shared = 
-      List.map (fun w -> (w.w_name, w.w_width), get_share w) in 
+    (* Check that all input/output wire has been correctly 
+       dispached to public/random/input *)
+    let tbl = Hashtbl.create 100 in
+    let add_in_out x = 
+      let w = Hashtbl.find env.wire x in
+      Hashtbl.add tbl x (Array.make w false) in
+    List.iter add_in_out env.winputs;
+    List.iter add_in_out env.woutputs;
+    let set_var (x,i as v) = 
+      let n = match i with None -> 0 | Some i -> i in
+      let t = 
+        try Hashtbl.find tbl x 
+        with Not_found -> error "ilang" None "unknown %a" pp_var v in
+      if t.(n) then error "ilang" None "multiple declaration of %a" pp_var v;
+      t.(n) <- true in
+    let set_in (_,vs) = List.iter set_var vs in
+    let set_out vs = List.iter set_var vs in
+    List.iter set_in env.inputs;
+    List.iter set_out env.outputs;
+    List.iter set_var env.randoms;
+    List.iter set_var env.publics;
+    let check x t = 
+      Array.iteri (fun i b -> 
+          if not b then
+            error "ilang" None "the index %i of wire %s is not dispached" i x) t
+    in
+    Hashtbl.iter check tbl;
+    
+    (* build the ilang representation *)
     { 
       ilm_name    = data m.mod_name;  
-      ilm_randoms = decls (sort env.randoms);
-      ilm_publics = decls (sort env.publics);
-      ilm_inputs  = decls_shared (sort env.inputs);
-      ilm_outputs = decls_shared (sort env.outputs);
-      ilm_others  = decls env.others; 
+      ilm_randoms = env.randoms;
+      ilm_publics = env.publics;
+      ilm_inputs  = env.inputs;
+      ilm_outputs = env.outputs; 
+      ilm_others  = env.others;
       ilm_cmd     = List.rev c;
     }
 
   let process_prog p = 
-    process_module  p.module_decl.wa_data
+    process_module p.module_decl.wa_data
 
 end
 (* ----------------------------------------------------------- *)
@@ -382,13 +443,9 @@ module ToProg = struct
   module E=Expr
   module P = Prog
 
-  type envm = {
-      vtbl: (var, E.var * P.expr) Hashtbl.t;
-    } 
+  type envm = (var, E.var * P.expr) Hashtbl.t
 
-  let empty_envm () = {
-      vtbl = Hashtbl.create 107;
-    }
+  let empty_envm () = Hashtbl.create 107
                     
   let mk_op op = HS.make op
                
@@ -399,63 +456,35 @@ module ToProg = struct
       | Some i -> Format.sprintf "%s.[%i]" s i in
     let v = E.V.mk_var xn in
     let e = P.Evar v in
-    Hashtbl.add envm.vtbl x (v,e);
+    Hashtbl.add envm x (v,e);
     v
-    
-  let mk_var_w envm (x, w) = 
-    if w = 1 then [mk_var envm (x,None)]
-    else
-      List.map (fun i -> mk_var envm (x,Some i)) (mk_range_i 0 (w-1))
 
-  let mk_vars envm decls = 
-    List.flatten (List.map (mk_var_w envm) decls) 
+  let mk_vars envm decls = List.map (mk_var envm) decls 
 
-  let nb_shares ((_,_),(nb,_)) = nb
-
-  let mk_in envm ((x,sz),(nb,iby)) = 
-    if sz = nb then
-      [E.V.mk_var x, mk_var_w envm (x,sz)]
-    else 
-      let ivar = mk_range_i 0 (sz/nb - 1) in
-      let ish  = mk_range_i 0 (nb-1) in
-      let doit iv =
-        let start = 
-          if iby = 1 then iv * nb 
-          else iv in
-        E.V.mk_var x, 
-        List.map (fun i -> mk_var envm (x, Some (start + i*iby))) ish in
-      List.map doit ivar 
-      
-  let mk_inputs envm ins = 
-    match ins with
-    | w :: _ -> 
-      let nbshares = nb_shares w in
-      if not (List.for_all (fun w -> nbshares = nb_shares w) ins) then
-        error "ilang_to_prog:" None "numbers of shares not equals";
-      nbshares, List.flatten (List.map (mk_in envm) ins)
-    | _ -> error "ilang_to_prog:" None "no input"
-      
-
-  let mk_outputs envm nbshares out = 
-    if not (List.for_all (fun w -> nbshares = nb_shares w) out) then
-      error "ilang_to_prog:" None "invalid numbers of output shares";
-    List.map snd (List.flatten (List.map (mk_in envm) out))
-  
-  let to_var envm x = 
-    try Hashtbl.find envm.vtbl x 
+  let mk_in envm decls = 
+    let do1 i (x,xs) = 
+      let x = 
+        match x with 
+        | Some s -> s 
+        | None -> "input_"^(string_of_int i) in
+      mk_var envm (x,None), mk_vars envm xs in
+    List.mapi do1 decls 
+ 
+  let of_var envm x = 
+    try Hashtbl.find envm x 
     with Not_found -> assert false 
 
   let ksubst = Parsetree.IK_subst 
   let kglitch = Parsetree.IK_glitch 
 
-  let to_arg envm = function
-    | Avar x -> snd (to_var envm x)
+  let of_arg envm = function
+    | Avar x -> snd (of_var envm x)
     | Aconst c -> P.Eop (mk_op c, [])
 
   let op_ff = mk_op "$FF"
 
   let to_expr envm op args = 
-    match op, List.map (to_arg envm) args with
+    match op, List.map (of_arg envm) args with
     | Oand, [e1; e2] -> ksubst , P.Emul(e1, e2)
     | Oxor, [e1; e2] -> ksubst , P.Eadd(e1, e2)
     | Onot, [e1]     -> ksubst , P.Enot e1
@@ -464,19 +493,19 @@ module ToProg = struct
     | _   , _        -> assert false 
 
   let mk_instr envm i = 
-    let i_var = fst (to_var envm i.i_dest) in
+    let i_var = fst (of_var envm i.i_dest) in
     let i_kind, i_expr = to_expr envm i.i_op i.i_args in 
     P.Iassgn P.{ i_var; i_kind; i_expr}
     
   let func_of_mod modul = 
     let envm = empty_envm () in
-    let f_name = Expr.V.mk_var modul.ilm_name in
-    let f_pin = mk_vars envm modul.ilm_publics in
-    let nshare, f_in = mk_inputs envm modul.ilm_inputs in
-    let f_out   = mk_outputs envm nshare modul.ilm_outputs in
+    let f_name  = Expr.V.mk_var modul.ilm_name in
+    let f_pin   = mk_vars envm modul.ilm_publics in
+    let f_in    = mk_in envm modul.ilm_inputs in
+    let f_out   = List.map (mk_vars envm) modul.ilm_outputs in
     let f_other = mk_vars envm modul.ilm_others  in
     let f_rand  = mk_vars envm modul.ilm_randoms in
-    let f_cmd  = List.map (mk_instr envm) modul.ilm_cmd in
+    let f_cmd   = List.map (mk_instr envm) modul.ilm_cmd in
     P.{ f_name; f_pin; f_in; f_out; f_other; f_rand; f_cmd }
 
 

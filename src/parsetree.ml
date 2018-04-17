@@ -72,7 +72,7 @@ type func = {
 type command = 
   | Func       of func
   | NI         of ident 
-  | SNI        of ident 
+  | SNI        of ident * (int * int) option
   | Probing    of ident 
   | Read_file  of string located
   | Read_ilang of string located

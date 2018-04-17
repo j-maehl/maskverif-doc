@@ -116,38 +116,6 @@ let find_bij state maxparams ldfs =
     let is_in (e1, _) = is_top_expr state e1 in
     List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
 
-(*
-exception Found_ee of (expr * expr)
-
-let rec can_remove ldfs =
-  match ldfs with
-  | [] -> [] 
-  | ldf :: ldfs ->
-    let cr = can_remove ldfs in
-    if ldf.L.n < ldf.L.p then (ldf.L.n, ldf.L.l, ldf.L.p) :: cr
-    else cr
-
-let find_bij state maxparams ldfs =
-  clear_state state;
-  L.set_top_exprs2 state ldfs;
-  init_todo state;
-  let _ = 
-    try simplify_until_with_clear2 state maxparams (can_remove ldfs)
-    with State.CanNotCheck le ->
-      let find e =
-        try 
-          List.iter (fun ldf ->
-              List.iter (fun (e1,e2) -> 
-                  if E.equal e e1 then 
-                    raise (Found_ee(e1,e2))) ldf.L.l) ldfs;
-          assert false
-        with Found_ee ee -> ee in
-      raise (CanNotCheck (List.map find le))
-  in
-  let is_in (e1, _) = is_top_expr state e1 in
-  List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs
- 
- *)
 let pp_z fmt z = 
   let s = Z.to_string z in
   let len = Bytes.length s in
@@ -197,12 +165,6 @@ let check_all state maxparams (ldfs:L.ldfs) =
     if !count land 0x3FFFF = 0 then 
       Format.eprintf "%a tuples checked over %a in %.3f@."
         pp_z !tdone pp_z to_check (Sys.time () -. t0);
-
-(*    let pp_ldf fmt ldf = 
-      Format.fprintf fmt "[%i : %a]" ldf.L.n 
-          (Util.pp_list ", " (fun fmt (e1,_e2) -> pp_expr fmt e1)) ldf.L.l in
-    Format.eprintf "check_all %a@." 
-               (Util.pp_list " " pp_ldf) ldfs;  *)
 
     let continue, ldfs = L.simplify_ldfs state maxparams ldfs in
     if continue then 
@@ -367,7 +329,17 @@ let check_all_para state maxparams (ldfs:L.ldfs) =
 
   with e -> (cleanup (); raise e)
 
-let check_ni ?(fname="") params nb_shares all =
+let pp_ok fmt (fname,s) = 
+  match fname with
+  | None -> Format.fprintf fmt "%s" s
+  | Some x -> Format.fprintf fmt "%s is %s" x s
+
+let pp_fail fmt (fname,s,le) = 
+  match fname with
+  | None -> Format.fprintf fmt "@[<v>Error not %s:@ %a@]" s print_error le 
+  | Some x -> Format.fprintf fmt "@[<v>Error %s is not %s:@ %a@]" x s print_error le 
+
+let check_ni ?fname params nb_shares all =
   try 
     let len = List.length all in
     let state = init_state nb_shares params in
@@ -375,11 +347,22 @@ let check_ni ?(fname="") params nb_shares all =
     let all = List.map (fun e -> e, e) all in
     let args = L.cons order all len [] in
     check_all state order args;
-    Format.printf "%s is NI@." fname 
+    Format.printf "%a@." pp_ok (fname,"NI")
   with CanNotCheck le ->
-    Format.eprintf "@[<v>In %s:@ %a@]@." fname print_error le
+    Format.eprintf "%a@." pp_fail (fname,"NI",le)
 
-let check_fni ?(para = false) s f params nb_shares interns outs =
+let main_threshold order params all = 
+  try 
+    let state = init_state 1 params in
+    let all = List.map (fun e -> e, e) all in
+    let len = List.length all in
+    let args = L.cons order all len [] in
+    check_all state 0 args;
+    Format.printf "t-threshold secure@."
+  with CanNotCheck le ->
+    Format.eprintf "%a@." print_error le
+
+let check_fni ?(para = false) ?fname s f params nb_shares ?from ?to_ interns outs =
   try 
     let len_i = List.length interns in
     let len_o = List.length outs in
@@ -387,7 +370,14 @@ let check_fni ?(para = false) s f params nb_shares interns outs =
     let order = nb_shares - 1 in 
     let interns = List.map (fun e -> e, e) interns in
     let outs = List.map (fun e -> e, e) outs in 
-    for ki = 0 to order do
+    let mk_bound dft = function
+      | None -> dft 
+      | Some i -> i in
+    let from = mk_bound 0 from in
+    let to_ = mk_bound order to_ in
+    if not (0 <= from && to_ <= order) then
+      error "check_fni" None "invalid range";
+    for ki = from to to_ do
       let ko = order - ki in
       Format.eprintf "Start checking of ki = %i, ko = %i@." ki ko;
       (if ki <= len_i && ko <= len_o then
@@ -396,12 +386,15 @@ let check_fni ?(para = false) s f params nb_shares interns outs =
          (if para then check_all_para else check_all) state (f ki ko) args);
       Format.eprintf "Checking of ki = %i, ko = %i done@." ki ko;
     done;
-    Format.printf "%s@." s
+    let pp_range fmt () = 
+      if from <> 0 || to_ <> order then
+        Format.fprintf fmt " for range %i..%i" from to_ in
+    Format.printf "%a%a@." pp_ok (fname,s) pp_range ()
   with CanNotCheck le ->
-    Format.eprintf "%a@." print_error le
+    Format.eprintf "%a@." pp_fail (fname,s,le)
 
-let check_sni ?para = check_fni ?para "SNI" (fun ki _ko -> ki)
-let check_fni ?para = check_fni ?para "FNI" 
+let check_sni ?para ?fname = check_fni ?para "SNI" ?fname (fun ki _ko -> ki)
+let check_fni ?para ?fname = check_fni ?para ?fname "FNI" 
 
 let mk_interns outs = 
   let souts = Se.of_list outs in
@@ -421,9 +414,6 @@ let mk_interns outs =
 
 let main_sni params nb_shares outs = 
   check_sni ~para:false params nb_shares (mk_interns outs) outs
-
-(*let main_ni params nb_shares outs = 
-  check_ni params nb_shares (mk_interns outs) outs *)
 
 let main_fni f params nb_shares outs = 
   check_fni f params nb_shares (mk_interns outs) outs

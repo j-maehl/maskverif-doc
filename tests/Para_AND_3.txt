@@ -10,7 +10,7 @@ proc SHIFT1:
 
   b0 := a3;
   b[1:3] := a[0:2];
-
+end
 
 proc SHIFT2:
   inputs: a[0:3]
@@ -18,26 +18,48 @@ proc SHIFT2:
 
   b[0:1] := a[2:3];
   b[2:3] := a[0:1];
+end
 
 proc AND:
   inputs: a[0:3], b[0:3]
   outputs: c[0:3]
-  shares: ab[0:3], ba[0:3], sa[0:3], sb[0:3], sr[0:3]
+  shares: ab[0:3]
   randoms: r[0:3];
 
+  ab := a * b;      
+  c   = ![ab + r]; 
+  ab := a * (b>>1);
+  c   = ![c + ab];
+  ab := (a>>1) * b;
+  c   = ![c + ab];
+  c   = ![c + (r>>1)];
+  ab := a * (b >> 2);
+  c  := c + ab;
+end
+
+NI AND
+
+proc SNIAND:
+  inputs: a[0:3], b[0:3]
+  outputs: c[0:3]
+  shares: ab[0:3], ba[0:3], sa[0:3], sb[0:3], sr[0:3]
+  randoms: r[0:3],r';
+
   ab := a * b;
-  c   = ab + r;
+  c   = ![ab + r]; 
   sa := a >> 1;
   sb := b >> 1;
   ab := sa * b;
-  c   = c + ab;
+  c   = ![c + ab];
   ba := a * sb;
-  c   = c + ba;
+  c   = ![c + ba];
   sr := r >> 1;
-  c   = c + sr;
+  c   = ![c + sr];
   sb := b >> 2;
   ab := a * sb;
-  c   = c + ab;
+  c   = ![c + ab];
+  c   := c + [r',r',r',r'];
+end 
 
-   
+SNI SNIAND   
   

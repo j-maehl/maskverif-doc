@@ -45,11 +45,11 @@ module Hv = Hashtbl.Make(V)
 type rnd = var
 type param = var 
 
-let pp_var fmt v = Format.fprintf fmt "%s" v.v_name
+let pp_var fmt v = Format.fprintf fmt "%s" v.v_name 
 
 let pp_rnd fmt r = Format.fprintf fmt "$%a" pp_var r
 
-let pp_share fmt (p,s) = Format.fprintf fmt "%a%i" pp_var p s
+let pp_share fmt (p,s) = Format.fprintf fmt "%a.[%i]" pp_var p s
 
 (* ----------------------------------------------------------------------- *)
 

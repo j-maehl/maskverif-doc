@@ -57,10 +57,11 @@ rule main = parse
                  let token = 
                    try Hashtbl.find keywords id with Not_found -> IDENT id in
                  let to_string lexbuf = 
-                   Buffer.contents (read_string (Buffer.create 0) lexbuf) in
+                   Buffer.contents (read_blank_string (Buffer.create 0) lexbuf)
+                 in
                  match token with
                  | NI _         -> NI (to_string lexbuf)
-                 | SNI _        -> SNI (to_string lexbuf)
+                 | SNI _        -> SNI (to_string lexbuf) 
                  | PROBING _    -> PROBING (to_string lexbuf) 
                  | READ_FILE _  -> READ_FILE (to_string lexbuf) 
                  | READ_ILANG _ -> READ_ILANG (to_string lexbuf) 
@@ -79,20 +80,26 @@ rule main = parse
   | ":"         { COLON }
   | "="         { EQ }
   | ":="        { DOTEQ }
-  | "!="        { MARKEQ }
   | "+"         { ADD }
   | "*"         { MUL }
-  | "!"         { NOT }
+  | "~"         { NOT }
+  | "!"         { MARK }
   | ";"         { SEMICOLON }
   | ">>"        { LSR }
   | "<<"        { LSL }
   | eof         { EOF }
 
+and read_blank_string buf = parse 
+  | blank       { read_blank_string buf lexbuf }
+  | newline     { Lexing.new_line lexbuf; read_blank_string buf lexbuf }
+  | eof         { unterminated_string () }
+  | _ as c      { Buffer.add_char buf c;read_string buf lexbuf }
+
 and read_string buf = parse 
-  | blank+        { read_string buf lexbuf }
+  | blank         { buf }
   | newline       { Lexing.new_line lexbuf; buf }
-  | eof           { unterminated_string () }
-  | _ as c        { Buffer.add_char buf c   ; read_string buf lexbuf }
+  | eof           { buf }
+  | _ as c        { Buffer.add_char buf c; read_string buf lexbuf }
 
 and comment = parse
   | "*)"        { () }

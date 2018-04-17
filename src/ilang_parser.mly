@@ -12,7 +12,7 @@
 %token <int>INT
 %token <string>CONST
 
-%token WIRE RANDOM PUBLIC INPUT OUTPUT WIDTH SHARES
+%token WIRE INPUT OUTPUT WIDTH 
 %token CELL
 %token CONNECT
 
@@ -20,6 +20,10 @@
 %token LCURLY RCURLY
 %token COLON
 %token EOF
+
+%token SHARPSHARP
+%token RANDOM PUBLIC
+
 %start prog
 %type <Ilang_ast.prog> prog
 
@@ -30,6 +34,29 @@
 
 ident:
   | x=loc(IDENT) { x }
+
+
+
+/* parse extra stuff */
+
+id_index:
+  | x=ident                         { x, None }
+  | x=ident LBRACKET i=INT RBRACKET { x, Some i }
+
+share_decl:
+  | x=ident                                     { Sident x }
+  | x=ident LBRACKET i=INT COLON j=INT RBRACKET { Sindex(x,i,j) }
+  | x=ident LBRACKET ns=INT+ RBRACKET           { Svindex(x,ns) }
+  | LBRACKET xs=id_index+ RBRACKET              { Svect(xs) }
+
+name_decl:
+  | COLON x=ident                             { x }
+
+maskverif_decl:
+  | SHARPSHARP INPUT  x=name_decl? s=share_decl  { Input (x,s) }
+  | SHARPSHARP OUTPUT s=share_decl           { Output s }
+  | SHARPSHARP RANDOM xs=id_index*           { Random xs }
+  | SHARPSHARP PUBLIC xs=id_index*           { Public xs }
 
 attribute_arg:
   | i=INT    { AA_int i }
@@ -42,33 +69,27 @@ attribute:
 with_attribute(X):
   | la=list(attribute) x=X { { attribute = la; wa_data = x} }
 
-shares_by:
-  | SHARES nb=INT iby=INT { nb,iby }
-
 wire_opt:
-  | RANDOM INPUT i=INT { WO_random i }
-  | PUBLIC INPUT i=INT { WO_public i}
-  | INPUT  i=INT s=shares_by? { WO_input(i,s)}
-  | OUTPUT i=INT s=shares_by? { WO_output(i,s)}
-  | WIDTH  i=INT { WO_width i}
+  | INPUT  i=INT { WO_input  i}
+  | OUTPUT i=INT { WO_output i}
+  | WIDTH  i=INT { WO_width  i}
 
 index:
   | LBRACKET i=INT COLON j=INT RBRACKET { i,j }
   | LBRACKET i=INT RBRACKET             { i,i }
 
-index1:
-  | LBRACKET i=INT RBRACKET             { i }
-
-ident_index:
-  | x=ident i=index1? { x,i} 
-
 connect_expr1:
-  | i=ident_index   { Eid i }
-  | c=CONST         { Econst c }
+  | i=id_index   { Eid i }
+  | c=CONST      { Econst c }
+
+connect_exprn:
+  | e=connect_expr1 { [e] }
+  | x=ident LBRACKET i=INT COLON j=INT RBRACKET 
+    { List.map (fun i -> Eid (x,Some i)) (mk_range_i i j) }
 
 connect_expr:
   | e=connect_expr1                        { Rexpr e }
-  | LCURLY es=list(connect_expr1) RCURLY   { Rvect es }
+  | LCURLY es=list(connect_exprn) RCURLY   { Rvect (List.flatten es) }
 
 c_connect:
   | CONNECT lhs=ident rhs=connect_expr1 { 
@@ -83,16 +104,18 @@ connect:
      { connect_lhs = (x,i); connect_rhs = rhs } }
 
 decl:
-  | WIRE o=list(wire_opt) x=ident { Wire(o,x) }
-  | c=cell                        { Cell c }
-  | c=connect                     { Connect c }
+  | WIRE o=list(wire_opt) x=ident  { Wire(o,x) }
+  | c=cell                         { Cell c }
+  | c=connect                      { Connect c }
+  | d=maskverif_decl               { Decl d }
 
 module1:
   | MODULE x=ident ld=list(with_attribute(decl)) END { 
     { mod_name = x; mod_decl = ld} }
 
 prog:
-  | AUTOIDX n=INT m=with_attribute(module1) EOF { 
-    { pautoidx = n; module_decl = m} }
+  | AUTOIDX n=INT 
+    m=with_attribute(module1) EOF { 
+          { pautoidx = n; module_decl = m} }
   | error { parse_error (Location.make $startpos $endpos) None }
  

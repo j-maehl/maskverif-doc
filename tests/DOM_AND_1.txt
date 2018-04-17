@@ -3,14 +3,16 @@ proc AND:
   outputs: c = c0 + c1
   randoms: r0;
 
-  t0 = a0*b1 + r0;
+  t0 = ![a0*b1 + r0];
   c0 := a0*b0 + t0;
 
-  t1 = a1*b0 + r0;
+  t1 = ![a1*b0 + r0];
   c1 := a1*b1 + t1;
 end 
 
 NI AND
+SNI AND
+
 
 
 

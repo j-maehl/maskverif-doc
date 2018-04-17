@@ -63,10 +63,29 @@ let check_ni f =
     Prog.build_obs_func ~ni:`NI (loc f) func in
   Format.printf "@[<v>observations:@ %a@]@."
     (pp_list "@ " (fun fmt e -> Format.fprintf fmt "@[%a@]" Expr.pp_expr e))
-    all;
+    all; 
   Checker.check_ni ~fname:(data f) params nb_shares all
 
-let check_sni f =
+let check_threshold f = 
+  let func = Prog.get_global globals f in
+  let order = 
+    match func.Prog.f_in with
+    | (_,xs) :: _ -> List.length xs - 1 
+    | _           -> assert false in
+  assert (0 < order);
+  Format.printf "Checking Threshold for %s:@." (data f);
+  let func = Prog.threshold func in
+(*  Format.printf "%a@." (Prog.pp_func true) func; *)
+  let (params, _, all, _) = 
+    Prog.build_obs_func ~ni:`Threshold (loc f) func in
+(*  Format.printf "@[<v>observations:@ %a@]@."
+    (pp_list "@ " (fun fmt e -> Format.fprintf fmt "@[%a@]" Expr.pp_expr e))
+    all; *)
+  Checker.main_threshold order params all
+             
+let check_sni f b =
+  let from, to_ = 
+    match b with None -> None, None | Some (i,j) -> Some i, Some j in
   let func = Prog.get_global globals f in
   Format.printf "Checking SNI for %s:@." (data f);
   let (params, nb_shares, interns, outputs) = 
@@ -77,25 +96,26 @@ let check_sni f =
   Format.printf "@[<v>outputs:@ %a@]@."
     (pp_list "@ " (fun fmt e -> Format.fprintf fmt "@[%a@]" Expr.pp_expr e))
     outputs;  
-  Checker.check_sni params nb_shares interns outputs 
+  Checker.check_sni ~fname:(data f) ?from ?to_ params nb_shares interns outputs 
   
 let pp_added func = 
-  Format.printf "proc %s added@." func.Prog.f_name.Expr.v_name 
+  Format.printf "proc %s added@." func.Prog.f_name.Expr.v_name
+(* ;Format.printf "%a@." (Prog.pp_func false) func *)
+
 
 let rec process_command c = 
   match c with
   | Func f ->
     pp_added (Prog.Process.func globals f)
   | NI f       -> check_ni f
-  | SNI f      -> check_sni f
-  | Probing _f -> assert false 
+  | SNI (f,b)  -> check_sni f b
+  | Probing f  -> check_threshold f 
   | Read_file filename ->
     Format.eprintf "read_file %s@." (data filename);
     process_file filename
   | Read_ilang filename ->
     Format.eprintf "read_ilang %s@." (data filename);
     let func = Ilang.process_file (data filename) in
-    Format.printf "%a@." (Prog.pp_func false) func;
     Prog.add_global globals func 
   | Exit -> 
     Format.eprintf "Bye bye!@.";

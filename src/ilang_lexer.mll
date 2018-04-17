@@ -21,11 +21,10 @@
     "end"       , END;
     "wire"      , WIRE; 
     "random"    , RANDOM;
-    "public"    , PUBLIC; 
+    "public"    , PUBLIC;
     "input"     , INPUT;
     "output"    , OUTPUT;
     "width"     , WIDTH;
-    "shares"    , SHARES;
     "cell"      , CELL;
     "connect"   , CONNECT;
   ]
@@ -58,11 +57,13 @@ rule main = parse
   | blank+      { main lexbuf }
   | keywords as id { try Hashtbl.find keywords id 
                      with Not_found -> 
-                       lex_error lexbuf ("unknown keyword "^id) }
+                       IDENT id }
   | ident as id  { IDENT id }
   | uint as n    { INT (int_of_string n) }
   | "\""         { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) } 
+  | "##"         { SHARPSHARP }
   | "#"          { comment lexbuf; main lexbuf }
+
   | "["         { LBRACKET }
   | "]"         { RBRACKET }
   | "{"         { LCURLY }

@@ -17,7 +17,7 @@
 %token LCURLY
 %token RCURLY
 %token COMMA SEMICOLON COLON
-%token MARKEQ DOTEQ EQ 
+%token MARK DOTEQ EQ 
 %token LSR LSL
 %token ADD MUL NOT
 %token EOF
@@ -79,9 +79,9 @@ expr:
 %inline assgn: 
   | x=vcall DOTEQ e=expr 
     { {i_var = x; i_kind = IK_subst; i_expr = e } }
-  | x=vcall MARKEQ e=expr  
+  | x=vcall EQ e=expr  
     { {i_var = x; i_kind = IK_sub; i_expr = e } }
-  | x=vcall EQ e=expr
+  | x=vcall EQ MARK LBRACKET e=expr RBRACKET
     { {i_var = x; i_kind = IK_glitch; i_expr = e } }
   | x=vcall EQ LCURLY e=expr RCURLY     
     { {i_var = x; i_kind = IK_hide; i_expr = e } }
@@ -142,18 +142,21 @@ func:
     END
     { { f_name; f_pin; f_in; f_out; f_shares; f_rand; f_cmd } }
 
+sni_bound:
+  | to_=INT          { 0,to_ }
+  | from=INT COLON to_=INT { from, to_ }
 command1:
   | f=func            { Func f }
   | f=loc(NI)         { NI f }
-  | f=loc(SNI)        { SNI f }
+  | b=sni_bound? f=loc(SNI) { SNI (f,b) }
   | f=loc(PROBING)    { Probing f}
   | f=loc(READ_FILE)  { Read_file f  }
   | f=loc(READ_ILANG) { Read_ilang f }
   | error             { parse_error (Location.make $startpos $endpos) None }
 
 command:
-  | c=command1 { c }
-  | EOF        { Exit }
+  | c=command1     { c }
+  | EOF            { Exit }
 
 file:
   | c=list(command1) EOF { c }
