@@ -14,7 +14,7 @@ type node = {
 and descriptor = 
 | Top
 | Rnd   of rnd 
-| Share of param * int 
+| Share of param * int * var
 | Pub   of var 
 | Neg   of node 
 | Add   of node * node
@@ -61,7 +61,7 @@ let top_node = {
 let pp_descriptor fmt = function 
   | Top        -> Format.fprintf fmt "TOP"
   | Rnd i      -> pp_rnd fmt i
-  | Share (p,i)-> pp_share fmt (p,i)
+  | Share (p,i,v) -> pp_share fmt (p,i,v)
   | Pub x      -> pp_var fmt x
   | Neg e      -> Format.fprintf fmt "!%i" e.node_id
   | Add(e1,e2) -> Format.fprintf fmt "%i + %i" e1.node_id e2.node_id
@@ -222,7 +222,7 @@ let declare_random state n =
 
 let add_children state p c = 
   begin match p.descriptor with
-  | Share(x,_) when Vector.size p.children = 0 ->
+  | Share(x,_,_) when Vector.size p.children = 0 ->
     add_used_share state x
   | _ -> ()
   end;
@@ -258,7 +258,7 @@ let rec add_expr state e =
       match e.e_node with
       | Etop         -> assert false 
       | Ernd r       -> Rnd r
-      | Eshare(p, i) -> Share(p,i)
+      | Eshare(p,i,v) -> Share(p,i,v)
       | Epub x       -> Pub x
       | Eneg e       -> 
         let n = add_expr state e in
@@ -284,9 +284,9 @@ let rec add_expr state e =
     set_parents state n;
     He.add state.s_hash e n;
     begin match descriptor with
-    | Rnd _      -> declare_random state n
-    | Share(p,_) -> declare_share state p n
-    | _           -> ()
+    | Rnd _        -> declare_random state n
+    | Share(p,_,_) -> declare_share state p n
+    | _            -> ()
     end;
     n
 
@@ -311,7 +311,7 @@ and remove_node state n =
   match n.descriptor with
   | Top   -> assert false 
   | Rnd _ -> ()
-  | Share(a,_) -> rm_used_share state a 
+  | Share(a,_,_) -> rm_used_share state a 
   | Pub _ -> ()
   | Neg p -> remove_child state p n
   | Add(p1,p2) | Mul(p1,p2) ->
@@ -385,7 +385,7 @@ let add_top_expr state e =
 
 (* ----------------------------------------------------------------------- *)
 
-let simplified_expr state = 
+let simplified_expr ?(notfound=false) state = 
   let tbl = Hn.create 1000 in
   let rec aux n = 
     try Hn.find tbl n 
@@ -394,7 +394,7 @@ let simplified_expr state =
         match n.descriptor with
         | Top        -> top
         | Rnd r      -> rnd r
-        | Share(p,i) -> share p i
+        | Share(p,i,v) -> share p i v
         | Pub x      -> pub x
         | Neg n      -> neg (aux n)
         | Add(n1,n2) -> add (aux n1) (aux n2)
@@ -404,11 +404,9 @@ let simplified_expr state =
       Hn.add tbl n e;
       e in
   let doit e = 
-    let n = 
-      try He.find state.s_hash e 
-      with Not_found -> assert false in
-    aux n
-  in
+    try aux (He.find state.s_hash e)
+    with Not_found ->
+      assert (notfound); e in
   doit 
 
 

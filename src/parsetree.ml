@@ -54,7 +54,7 @@ type instr =
   | Iassgn of assgn
   | Imacro of macro_call 
 
-type cmd = instr list
+type cmd = (instr located) list
 
 type ids = 
   | Ids   of ident list 
@@ -69,13 +69,21 @@ type func = {
   f_rand   : (ident * range option) list;
   f_cmd    : cmd }
 
+type checker_option = 
+  | Order of int 
+  | NoGlitch
+  | Para
+
+type checker_options = checker_option list
+
 type command = 
   | Func       of func
-  | NI         of ident 
-  | SNI        of ident * (int * int) option
-  | Probing    of ident 
+  | NI         of ident * checker_options
+  | SNI        of ident * (int * int) option * checker_options
+  | Probing    of ident * checker_options
   | Read_file  of string located
   | Read_ilang of string located
+  | Print      of ident 
   | Exit 
 
 (* --------------------------------------------------------- *)
@@ -185,7 +193,8 @@ let pp_call fmt i =
    Format.fprintf fmt "@[<hov 2> %a =@ %a%a@]" 
      pp_vcalls i.i_lhs pp_ident i.i_macro pp_vcalls i.i_args 
 
-let pp_instr fmt = function 
+let pp_instr fmt i = 
+  match data i with
   | Iassgn i -> pp_assgn fmt i
   | Imacro  i -> pp_call fmt i
  

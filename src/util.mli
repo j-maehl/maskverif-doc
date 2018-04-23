@@ -4,6 +4,7 @@ module List : sig
     val count : ('a -> bool) -> 'a list -> int
     val map_size : ('a -> 'b) -> 'a list -> 'b list * int
     val is_empty : 'a list -> bool
+    val equal : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
   end
 
 val partition :
@@ -145,6 +146,16 @@ module HS : sig
 
   val compare : t -> t -> int 
 
-  val empty : t 
 end
+
+val _DFF_PP0_ : HS.t
+val _DFF_PN0_ : HS.t
+val _DFFSR_PPP_ : HS.t
+val is_FF_op : HS.t -> bool
+
+val _TUPLE_ : HS.t
+
+(* --------------------------------------------------------- *)
+val pp_z : Format.formatter -> Z.t -> unit
+val pp_human : string -> Format.formatter -> Z.t -> unit
 

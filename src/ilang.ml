@@ -53,7 +53,7 @@ type operator =
   | Oand 
   | Onot
   | Oxor 
-  | Off 
+  | Off of Util.HS.t
   | Oid
 
 type arg = 
@@ -63,7 +63,8 @@ type arg =
 type instr = {
     i_dest : var;
     i_op   : operator;
-    i_args : arg list
+    i_args : arg list;
+    i_attribute : attribute list * Location.t
   } 
 
 type ilang_module = {    
@@ -104,9 +105,9 @@ let pp_instr fmt i =
   | Oxor, [a1;a2] -> 
     Format.fprintf fmt "%a = %a + %a;" 
       pp_var i.i_dest pp_arg a1 pp_arg a2
-  | Off, es ->
-    Format.fprintf fmt "%a = #FF(@[%a@])" 
-      pp_var i.i_dest (pp_list ",@ " pp_arg) es
+  | Off s, es ->
+    Format.fprintf fmt "%a = %s(@[%a@])" 
+      pp_var i.i_dest s.hs_str (pp_list ",@ " pp_arg) es
   | _, _ -> assert false 
  
 (* ----------------------------------------------------------------------- *)
@@ -128,9 +129,15 @@ module Process = struct
       "$_XOR_", { o_input = ["\\A";"\\B"]; o_output = "\\Y"; o_desc = Oxor };
       "$_AND_", { o_input = ["\\A";"\\B"]; o_output = "\\Y"; o_desc = Oand };
       "$_DFF_PP0_",
-        { o_input = ["\\C";"\\D";"\\R";]; o_output = "\\Q"; o_desc = Off };
+        { o_input = ["\\C";"\\D";"\\R";]; o_output = "\\Q"; 
+          o_desc = Off _DFF_PP0_};
+      "$_DFF_PN0_",
+        { o_input = ["\\C";"\\D";"\\R";]; o_output = "\\Q"; 
+          o_desc = Off _DFF_PN0_};
+    
       "$_DFFSR_PPP_", 
-        { o_input = ["\\C";"\\D";"\\R";"\\S"]; o_output = "\\Q"; o_desc = Off } 
+        { o_input = ["\\C";"\\D";"\\R";"\\S"]; o_output = "\\Q"; 
+          o_desc = Off _DFFSR_PPP_} 
     ]
 
   let op_tbl = 
@@ -145,13 +152,15 @@ module Process = struct
 
   type vertex_kind = 
     | Vwire of var
-    | Vinstr of instr
+    | Vinstr of instr 
+
+  type dir = Downto | Upto
 
   type env = {
       vtbl : vertex_kind Hv.t;
       itbl : (var,G.V.t) Hashtbl.t;
       graph : G.t;
-      wire  : (string, int) Hashtbl.t;
+      wire  : (string, int * dir) Hashtbl.t;
       mutable winputs  : string list;
       mutable woutputs : string list;
       mutable randoms: var list;
@@ -193,6 +202,12 @@ module Process = struct
     | WO_width i :: _ -> i
     | _ :: wo         -> get_width wo
 
+  let rec get_dir wo = 
+    match wo with
+    | [] -> Downto
+    | WO_upto :: _ -> Upto
+    | _ :: wo -> get_dir wo
+
   let create_vertex env = 
     let v = G.V.create 0 in
     G.add_vertex env.graph v;
@@ -204,11 +219,12 @@ module Process = struct
     Hashtbl.add env.itbl x v
 
   let process_wire env md = 
-    match md.wa_data with
+    match data md.wa_data with
     | Wire (wo, x) ->
       let width = get_width wo in
+      let dir   = get_dir wo in
       let s = data x in
-      Hashtbl.add env.wire s width; 
+      Hashtbl.add env.wire s (width, dir); 
       begin match get_kind wo with
       | Kinput  -> 
         if width = 1 then add_input env (s, None)
@@ -235,7 +251,7 @@ module Process = struct
      with Not_found -> ilang_error (loc x) "undeclared wire %s" (data x)
 
    let mk_var env (x,i) =
-     let width = getw_width env x in
+     let width,_dir = getw_width env x in
      let i = 
        match i with
        | None -> 
@@ -249,14 +265,19 @@ module Process = struct
          else Some i in
      (data x, i)
      
+   let mk_dir_range dir width = 
+     if dir = Upto then mk_range_i 0 (width-1)
+     else mk_range_i (width-1) 0
+
    let mk_shares env = function
      | Sident x -> 
-       let width = getw_width env x in
+       let width,dir = getw_width env x in
        let s = data x in
-       List.map (fun i -> s, Some i) (mk_range_i 0 (width-1))
+       let range = mk_dir_range dir width in
+       List.map (fun i -> s, Some i) range 
        
      | Sindex (x,i,j) ->
-       let width = getw_width env x in
+       let width,_dir = getw_width env x in
        let s = data x in
        if not (0 <= i && i < width && 0 <= j && j < width) then
          ilang_error (loc x) "invalid range for %s" s;
@@ -277,7 +298,7 @@ module Process = struct
    let process_random env (x,i) =
      let s = data x in 
      if i = None then 
-       let width = getw_width env x in
+       let width,_dir = getw_width env x in
        if width = 1 then
          env.randoms <- (s, None) :: env.randoms
        else
@@ -289,7 +310,7 @@ module Process = struct
    let process_public env (x,i) =
      let s = data x in 
      if i = None then 
-       let width = getw_width env x in
+       let width,_dir = getw_width env x in
        if width = 1 then
          env.publics <- (s, None) :: env.publics
        else
@@ -310,9 +331,9 @@ module Process = struct
      
   let mk_arg env = function
     | Eid x    -> Avar (mk_var env x)
-    | Econst s -> Aconst s
+    | Econst s -> Aconst (data s)
 
-  let mk_instr env c = 
+  let mk_instr env c i_attribute =
     let od = operator_desc c.cell_name1 in
     let process_arg s = 
       let c = List.find (fun c -> data c.c_connect_lhs = s) c.cell_connect in
@@ -323,29 +344,34 @@ module Process = struct
       | Avar (x,i) -> (x,i)
       | _ -> assert false in
     let i_op = od.o_desc in
-    { i_dest; i_op; i_args }
+    { i_dest; i_op; i_args; i_attribute }
   
   let add_instr env i = 
     let v = create_vertex env in
     Hv.add env.vtbl v (Vinstr i);
     Hashtbl.add env.itbl i.i_dest v
   
-  let process_cell env c = add_instr env (mk_instr env c)
+  let process_cell env c aa = add_instr env (mk_instr env c aa)
   
-  let process_connect env c = 
+  let process_connect env c i_attribute = 
+    let cloc = loc c in
+    let c = data c in
     let do_v x = 
       let s = data x in
-      let w = getw_width env x in
+      let w,dir = getw_width env x in
       if w = 1 then [s ,None]
       else 
-        List.map (fun i -> s, Some i) (mk_range_i (w-1) 0) in
+        List.map (fun i -> s, Some i) (mk_dir_range dir w) in
 
-    let (x,r) = c.connect_lhs in
     let xs = 
-      match r with
-      | Some(i,j) -> List.map (fun i -> mk_var env (x,Some i)) (mk_range_i i j)
-      | None -> do_v x in
-        
+      let mk_x = function
+        | Eid (x,None) -> do_v x
+        | Eid x ->  [mk_var env x]
+        | Econst c -> ilang_error (loc c) "constant can not be used in a lhs" in
+      match c.connect_lhs with
+      | Rexpr e -> mk_x e 
+      | Rvect es -> List.flatten (List.map mk_x es) in
+         
     let es =
       let mk_e = function
         | Eid (x,None) -> List.map (fun x -> Avar x) (do_v x)
@@ -357,8 +383,9 @@ module Process = struct
     let n1 = List.length xs in
     let n2 = List.length es in
     if n1 <> n2 then
-      ilang_error (loc x) "invalid size for connect (lhs:%i, rhs: %i)" n1 n2;
-    let doi x e = add_instr env { i_dest = x; i_op = Oid; i_args = [e] } in
+      ilang_error cloc "invalid size for connect (lhs:%i, rhs: %i)" n1 n2;
+    let doi x e = 
+      add_instr env { i_dest = x; i_op = Oid; i_args = [e]; i_attribute} in
     List.iter2 doi xs es
 
   let process_module m = 
@@ -367,10 +394,11 @@ module Process = struct
     List.iter (process_wire env) m.mod_decl;
     (* process the other declarations, and build the graph *)
     let process_decl md = 
-      match md.wa_data with 
+      match data (md.wa_data) with 
+      | Parameter _ -> ()
       | Wire _    -> () 
-      | Cell c    -> process_cell env c
-      | Connect c -> process_connect env c
+      | Cell c    -> process_cell env c (md.attribute, loc md.wa_data)
+      | Connect c -> process_connect env c (md.attribute, loc md.wa_data)
       | Decl d    -> process_decl env d in
     List.iter process_decl m.mod_decl;
     (* add edges *) 
@@ -398,7 +426,7 @@ module Process = struct
        dispached to public/random/input *)
     let tbl = Hashtbl.create 100 in
     let add_in_out x = 
-      let w = Hashtbl.find env.wire x in
+      let w,_dir = Hashtbl.find env.wire x in
       Hashtbl.add tbl x (Array.make w false) in
     List.iter add_in_out env.winputs;
     List.iter add_in_out env.woutputs;
@@ -481,21 +509,34 @@ module ToProg = struct
     | Avar x -> snd (of_var envm x)
     | Aconst c -> P.Eop (mk_op c, [])
 
-  let op_ff = mk_op "$FF"
+  let op_ff s = mk_op s
 
   let to_expr envm op args = 
     match op, List.map (of_arg envm) args with
     | Oand, [e1; e2] -> ksubst , P.Emul(e1, e2)
     | Oxor, [e1; e2] -> ksubst , P.Eadd(e1, e2)
     | Onot, [e1]     -> ksubst , P.Enot e1
-    | Off ,  es      -> kglitch, P.Eop(op_ff, es)
+    | Off _s,  es     -> kglitch, List.nth es 1 (* P.Eop(s, es) *)
     | Oid , [e]      -> ksubst , e
     | _   , _        -> assert false 
+
+  let pp_attribute_arg fmt = function
+    | AA_int n -> Format.fprintf fmt "%i" n
+    | AA_string s -> Format.fprintf fmt "%s" s
+
+  let pp_attribute fmt (id, aa) = 
+    Format.fprintf fmt "(* attribute %s %a *) @ " (data id) pp_attribute_arg aa
+
+  let pp_attributes (a,loc) fmt () = 
+    Format.fprintf fmt "%a(* from %s*)@ "
+      (pp_list "" pp_attribute) a 
+      (Location.to_string loc)
 
   let mk_instr envm i = 
     let i_var = fst (of_var envm i.i_dest) in
     let i_kind, i_expr = to_expr envm i.i_op i.i_args in 
-    P.Iassgn P.{ i_var; i_kind; i_expr}
+    { P.instr_d = P.Iassgn P.{ i_var; i_kind; i_expr};
+      P.instr_info = pp_attributes i.i_attribute }
     
   let func_of_mod modul = 
     let envm = empty_envm () in

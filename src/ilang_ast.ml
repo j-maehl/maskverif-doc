@@ -17,12 +17,13 @@ type wire_opt =
   | WO_input  of int
   | WO_output of int 
   | WO_width  of int
+  | WO_upto 
 
 type id_index = ident * int option
 
 type expr = 
   | Eid of id_index 
-  | Econst of string
+  | Econst of string located
 
 type c_connect = {
     c_connect_lhs : ident;
@@ -42,7 +43,7 @@ type rhs =
   | Rvect of expr list
 
 type connect = {
-    connect_lhs : ident * (int * int) option;
+    connect_lhs : rhs; (* ident * (int * int) option; *)
     connect_rhs : rhs 
   }
 
@@ -59,14 +60,15 @@ type decl =
   | Public of id_index list
 
 type mod_decl = 
+  | Parameter of ident 
   | Wire of wire
   | Cell of cell
-  | Connect of connect
+  | Connect of connect located
   | Decl of decl
 
 type module1 = {
     mod_name : ident;
-    mod_decl : mod_decl with_attribute list
+    mod_decl : mod_decl located with_attribute list
   }
 
 type prog = { 

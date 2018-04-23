@@ -28,7 +28,7 @@ type expr = private {
 and expr_node = 
 | Etop
 | Ernd   of rnd
-| Eshare of param * int
+| Eshare of param * int * var
 | Epub   of var 
 | Eneg   of expr
 | Eadd   of expr * expr
@@ -52,7 +52,7 @@ module Me : Map.S with type key = expr
 
 val top   : expr
 val rnd   : rnd -> expr 
-val share : param -> int -> expr 
+val share : param -> int -> var -> expr 
 val pub   : var -> expr 
 val neg   : expr -> expr
 val add   : expr -> expr -> expr 
@@ -71,7 +71,16 @@ val tuple : expr array -> expr
 
 val pp_var    : Format.formatter -> var -> unit
 val pp_rnd    : Format.formatter -> rnd -> unit
-val pp_share  : Format.formatter -> param * int -> unit
+val pp_share  : Format.formatter -> param * int * var -> unit
 
 val pp_expr : Format.formatter -> expr -> unit
 
+(* --------------------------------------------------------------- *)
+type result = 
+  | Rb of bool
+  | Rtuple of result array 
+
+exception CheckBool 
+(* of expr list * (result,int) Hashtbl.t * (result,int) Hashtbl.t * bool He.t *)
+
+val check_bool : expr -> unit

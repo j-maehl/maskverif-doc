@@ -10,6 +10,7 @@ proc AND:
   c1 := a1*b1 + t1;
 end 
 
+Probing AND
 NI AND
 SNI AND
 

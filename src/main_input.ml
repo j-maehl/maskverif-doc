@@ -56,17 +56,39 @@ open Checker
   
 let globals = Hashtbl.create 107
 
-let check_ni f = 
+type check_opt = {
+   glitch : bool;
+   para   : bool;
+   order  : int option;
+  }
+
+let process_check_opt os = 
+  let glitch = ref true in
+  let para = ref false in
+  let order = ref None in
+  let doit = function
+    | NoGlitch -> glitch := false 
+    | Para -> para := true
+    | Order n -> order := Some n in
+  List.iter doit os;
+  { glitch = !glitch;
+    para   = !para;
+    order  = !order;
+  }
+
+let check_ni f o = 
   let func = Prog.get_global globals f in
   Format.printf "Checking NI for %s:@." (data f);
   let (params, nb_shares, all, _) = 
-    Prog.build_obs_func ~ni:`NI (loc f) func in
-  Format.printf "@[<v>observations:@ %a@]@."
-    (pp_list "@ " (fun fmt e -> Format.fprintf fmt "@[%a@]" Expr.pp_expr e))
-    all; 
-  Checker.check_ni ~fname:(data f) params nb_shares all
+    Prog.build_obs_func ~glitch:o.glitch ~ni:`NI (loc f) func in
+(*  Format.printf "@[<v>observations:@ %a@]@." Checker.pp_eis all; *)
+  let order = 
+    match o.order with
+    | None -> nb_shares - 1
+    | Some i -> i in
+  Checker.check_ni ~para:o.para ~fname:(data f) params ~order nb_shares all
 
-let check_threshold f = 
+let check_threshold f o = 
   let func = Prog.get_global globals f in
   let order = 
     match func.Prog.f_in with
@@ -75,41 +97,35 @@ let check_threshold f =
   assert (0 < order);
   Format.printf "Checking Threshold for %s:@." (data f);
   let func = Prog.threshold func in
-(*  Format.printf "%a@." (Prog.pp_func true) func; *)
+(*  Format.printf "%a@." (Prog.pp_func ~full:Prog.var_pinfo) func; *)
   let (params, _, all, _) = 
-    Prog.build_obs_func ~ni:`Threshold (loc f) func in
-(*  Format.printf "@[<v>observations:@ %a@]@."
-    (pp_list "@ " (fun fmt e -> Format.fprintf fmt "@[%a@]" Expr.pp_expr e))
-    all; *)
-  Checker.main_threshold order params all
+    Prog.build_obs_func ~glitch:o.glitch ~ni:`Threshold (loc f) func in
+ (* Format.printf "@[<v>observations:@ %a@]@." Checker.pp_eis all; *)
+  Checker.check_threshold ~para:o.para order params all
              
-let check_sni f b =
+let check_sni f b o =
   let from, to_ = 
     match b with None -> None, None | Some (i,j) -> Some i, Some j in
   let func = Prog.get_global globals f in
   Format.printf "Checking SNI for %s:@." (data f);
   let (params, nb_shares, interns, outputs) = 
-    Prog.build_obs_func ~ni:`SNI (loc f) func in
-  Format.printf "@[<v>interns:@ %a@]@."
-    (pp_list "@ " (fun fmt e -> Format.fprintf fmt "@[%a@]" Expr.pp_expr e))
-    interns;
-  Format.printf "@[<v>outputs:@ %a@]@."
-    (pp_list "@ " (fun fmt e -> Format.fprintf fmt "@[%a@]" Expr.pp_expr e))
-    outputs;  
-  Checker.check_sni ~fname:(data f) ?from ?to_ params nb_shares interns outputs 
+    Prog.build_obs_func ~glitch:o.glitch ~ni:`SNI (loc f) func in
+(*    Format.printf "@[<v>interns:@ %a@]@." Checker.pp_eis interns;
+    Format.printf "@[<v>outputs:@ %a@]@." Checker.pp_eis outputs;  *)
+  Checker.check_sni ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares interns outputs 
   
 let pp_added func = 
   Format.printf "proc %s added@." func.Prog.f_name.Expr.v_name
-(* ;Format.printf "%a@." (Prog.pp_func false) func *)
+(*  Format.printf "%a@." (Prog.pp_func ~full:Prog.dft_pinfo) func *)
 
 
 let rec process_command c = 
   match c with
   | Func f ->
     pp_added (Prog.Process.func globals f)
-  | NI f       -> check_ni f
-  | SNI (f,b)  -> check_sni f b
-  | Probing f  -> check_threshold f 
+  | NI (f,o)     -> check_ni f (process_check_opt o)
+  | SNI (f,b,o)  -> check_sni f b (process_check_opt o)
+  | Probing(f,o) -> check_threshold f (process_check_opt o)
   | Read_file filename ->
     Format.eprintf "read_file %s@." (data filename);
     process_file filename
@@ -117,6 +133,9 @@ let rec process_command c =
     Format.eprintf "read_ilang %s@." (data filename);
     let func = Ilang.process_file (data filename) in
     Prog.add_global globals func 
+  | Print f -> 
+    let func = Prog.get_global globals f in
+    Format.printf "%a@." (Prog.pp_func ~full:Prog.dft_pinfo) func
   | Exit -> 
     Format.eprintf "Bye bye!@.";
     exit 0

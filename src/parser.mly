@@ -5,9 +5,9 @@
 
 %}
 %token PROC END PUBLIC INPUTS OUTPUTS SHARES RANDOMS
-%token <string>SNI NI PROBING 
+%token <string>SNI NI PROBING PRINT
 %token <string>READ_FILE READ_ILANG
-
+%token NOGLITCH PARA ORDER
 %token <string> IDENT
 %token <int> INT
 %token LPAREN
@@ -19,7 +19,7 @@
 %token COMMA SEMICOLON COLON
 %token MARK DOTEQ EQ 
 %token LSR LSL
-%token ADD MUL NOT
+%token ADD MUL NOT 
 %token EOF
 %left ADD
 %left MUL
@@ -101,7 +101,7 @@ instr:
   | i=call  SEMICOLON { Imacro i }
 
 cmd: 
-  | c=list(instr) { c }
+  | c=list(loc(instr)) { c }
 
 shares:
   | xs=separated_list (ADD, ident) {xs}
@@ -145,13 +145,20 @@ func:
 sni_bound:
   | to_=INT          { 0,to_ }
   | from=INT COLON to_=INT { from, to_ }
+
+check_opt:
+  | ORDER n=INT {Order n }
+  | PARA     { Para }
+  | NOGLITCH { NoGlitch }
+
 command1:
-  | f=func            { Func f }
-  | f=loc(NI)         { NI f }
-  | b=sni_bound? f=loc(SNI) { SNI (f,b) }
-  | f=loc(PROBING)    { Probing f}
+  | f=func                               { Func f }
+  | o=check_opt* f=loc(NI)               { NI (f,o) }
+  | o=check_opt* b=sni_bound? f=loc(SNI) { SNI (f,b,o) }
+  | o=check_opt* f=loc(PROBING)          { Probing (f,o) }
   | f=loc(READ_FILE)  { Read_file f  }
   | f=loc(READ_ILANG) { Read_ilang f }
+  | f=loc(PRINT)      { Print f }
   | error             { parse_error (Location.make $startpos $endpos) None }
 
 command:

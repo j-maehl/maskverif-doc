@@ -23,10 +23,15 @@ type fname = E.var
 
 type macro_call = { i_lhs : vcalls; i_macro: fname; i_args : vcalls }
 
-type instr =
+type instr_d =
   | Iassgn of assgn
   | Imacro of macro_call 
 
+type instr = {
+    instr_d : instr_d;
+    instr_info : Format.formatter -> unit -> unit;
+  }
+  
 type cmd = instr list
 
 type func = {
@@ -41,16 +46,31 @@ type func = {
 (* ------------------------------------------------------------------- *)
 (* Pretty printing                                                     *)
 
-let pp_var full fmt x = 
+type print_info = {
+    var_full   : bool;
+    print_info : bool;
+  }
+
+let dft_pinfo = { 
+    var_full    = false;
+    print_info  = false;
+  }
+
+let var_pinfo = { 
+    var_full    = true;
+    print_info  = false;
+  }
+ 
+let pp_var ?(full=dft_pinfo) fmt x = 
   let pp_id fmt i = 
-    if full then Format.fprintf fmt "#%i" i in
+    if full.var_full then Format.fprintf fmt "#%i" i in
   Format.fprintf fmt "%s%a" x.E.v_name pp_id x.E.v_id
 
 
-let pp_expr full fmt e = 
+let pp_expr ?(full=dft_pinfo) fmt e = 
   let rec aux top fmt e = 
     match e with
-    | Evar x      -> pp_var full fmt x
+    | Evar x      -> pp_var ~full fmt x
     | Enot e      -> Format.fprintf fmt "!%a" (aux `Not) e
     | Eadd(e1,e2) -> 
       begin match top with
@@ -76,7 +96,7 @@ let pp_expr full fmt e =
     | Ebox e -> Format.fprintf fmt "[%a]" E.pp_expr e in
   aux `Top fmt e
 
-let pp_assgn full fmt i =
+let pp_assgn ?(full=dft_pinfo) fmt i =
   begin match i.i_kind with
   | P.IK_subst ->
     Format.fprintf fmt "@[<hov 2> %a :=@ %a@]" 
@@ -87,55 +107,59 @@ let pp_assgn full fmt i =
   | P.IK_glitch ->
     Format.fprintf fmt "@[<hov 2> %a =@ [%a]@]" 
   end
-     (pp_var full) i.i_var (pp_expr full) i.i_expr
+     (pp_var ~full) i.i_var (pp_expr ~full) i.i_expr
 
-let pp_vars full fmt xs = 
-  Format.fprintf fmt "@[<hov>%a@]" (pp_list ",@ " (pp_var full)) xs
+let pp_vars ?(full=dft_pinfo) fmt xs = 
+  Format.fprintf fmt "@[<hov>%a@]" (pp_list ",@ " (pp_var ~full)) xs
 
-let pp_vcall full fmt xs = 
-  Format.fprintf fmt "[%a]" (pp_vars full) xs
+let pp_vcall ?(full=dft_pinfo) fmt xs = 
+  Format.fprintf fmt "[%a]" (pp_vars ~full) xs
 
-let pp_vcalls full fmt xs = 
+let pp_vcalls ?(full=dft_pinfo) fmt xs = 
   Format.fprintf fmt "@[<hov>(%a)@]"
-    (pp_list ",@ " (pp_vcall full)) xs
+    (pp_list ",@ " (pp_vcall ~full)) xs
 
-let pp_call full fmt i = 
+let pp_call ?(full=dft_pinfo) fmt i = 
   Format.fprintf fmt "@[<hov 2> %a =@ %a%a@]" 
-    (pp_vcalls full) i.i_lhs (pp_var full) i.i_macro (pp_vcalls full) i.i_args 
+    (pp_vcalls ~full) i.i_lhs (pp_var ~full) i.i_macro (pp_vcalls ~full) i.i_args 
   
-let pp_instr full fmt = function 
-  | Iassgn i -> pp_assgn full fmt i
-  | Imacro  i -> pp_call full fmt i
- 
-let pp_cmd full fmt c = 
-  Format.fprintf fmt "@[<v>%a@]" (pp_list "@ " (pp_instr full)) c
+let pp_instr_d ?(full=dft_pinfo) fmt = function 
+  | Iassgn i -> pp_assgn ~full fmt i
+  | Imacro  i -> pp_call ~full fmt i
 
-let pp_decls full fmt xs = 
-  Format.fprintf fmt "@[<hov>%a@]" (pp_list ",@ " (pp_vcall full)) xs
+let pp_instr ?(full=dft_pinfo) fmt i = 
+  let pp_info fmt i = if full.print_info then i.instr_info fmt () in
+  Format.fprintf fmt "%a%a" pp_info i (pp_instr_d ~full) i.instr_d 
 
-let pp_indecls full fmt xs = 
+let pp_cmd ?(full=dft_pinfo) fmt c = 
+  Format.fprintf fmt "@[<v>%a@]" (pp_list "@ " (pp_instr ~full)) c
+
+let pp_decls ?(full=dft_pinfo) fmt xs = 
+  Format.fprintf fmt "@[<hov>%a@]" (pp_list ",@ " (pp_vcall ~full)) xs
+
+let pp_indecls ?(full=dft_pinfo) fmt xs = 
   let pp fmt (x,xs) = 
-    Format.fprintf fmt "(%a, %a)" (pp_var full) x (pp_vcall full) xs in
+    Format.fprintf fmt "(%a, %a)" (pp_var ~full) x (pp_vcall ~full) xs in
   Format.fprintf fmt "@[<hov>%a@]" (pp_list ",@ " pp) xs
 
-let pp_func full fmt func = 
+let pp_func ?(full=dft_pinfo) fmt func = 
   Format.fprintf fmt "@[<v>proc %a:@   " E.pp_var func.f_name;
   Format.fprintf fmt "@[<v>";
   Format.fprintf fmt "@[<hov>publics: @[%a@]@]@ "
-    (pp_list ",@ " (pp_var full)) func.f_pin;
+    (pp_list ",@ " (pp_var ~full)) func.f_pin;
 
-  Format.fprintf fmt "@[<hov>inputs : @[%a@]@]@ " (pp_indecls full) func.f_in;
-  Format.fprintf fmt "@[<hov>outputs: @[%a@]@]@ " (pp_decls full) func.f_out;
+  Format.fprintf fmt "@[<hov>inputs : @[%a@]@]@ " (pp_indecls ~full) func.f_in;
+  Format.fprintf fmt "@[<hov>outputs: @[%a@]@]@ " (pp_decls ~full) func.f_out;
   Format.fprintf fmt "@[<hov>randoms: @[%a@]@]@ "
-    (pp_list ",@ " (pp_var full)) func.f_rand;
+    (pp_list ",@ " (pp_var ~full)) func.f_rand;
   Format.fprintf fmt "@[<hov>others : @[%a@];@]@ @ "
-    (pp_list ",@ " (pp_var full)) func.f_other;
-  pp_cmd full fmt func.f_cmd;
+    (pp_list ",@ " (pp_var ~full)) func.f_other;
+  pp_cmd ~full fmt func.f_cmd;
   Format.fprintf fmt "@]@]"
 
-let pp_prog full fmt prog = 
+let pp_prog ?(full=dft_pinfo) fmt prog = 
   Format.fprintf fmt "@[<v>%a@]"
-    (pp_list "@ @ " (pp_func full)) prog 
+    (pp_list "@ @ " (pp_func ~full)) prog 
 
 (* ------------------------------------------------------------------------ *)
 (* Translation from Parsetree to Prog *)
@@ -233,9 +257,9 @@ module ToProg = struct
     let l = List.filter (fun x -> not (E.Sv.mem x env.init)) xs in
     match l with
     | [] -> ()
-    | [x] -> error loc "variable %a is not initialized" (pp_var false) x
+    | [x] -> error loc "variable %a is not initialized" (pp_var ~full:dft_pinfo)x
     | xs  -> error loc "variables %a are not initialized"
-               (pp_list ",@ " (pp_var false)) xs
+               (pp_list ",@ " (pp_var ~full:dft_pinfo)) xs
  
   let rec to_expr env e = 
     match data e with 
@@ -324,22 +348,33 @@ module ToProg = struct
   let check_para loc is = 
     let assigned = ref E.Sv.empty in
     let check i = 
-      match i with
+      match i.instr_d with
       | Iassgn i ->
         let inter = E.Sv.inter (vars i.i_expr) !assigned in
         if not (E.Sv.is_empty inter) then
           error loc 
             "invalid parrallel assignment: variables %a are used in both side" 
-            (pp_list ", " (pp_var false)) (E.Sv.elements inter);
+            (pp_list ", " (pp_var ~full:dft_pinfo)) (E.Sv.elements inter);
         assigned := E.Sv.add i.i_var !assigned
       | _ -> assert false in
     List.iter check is
-    
-  let to_assgn env i = 
+
+  let pp_loc_info loc fmt () = 
+    Format.fprintf fmt "(* %s *)@ " (Location.to_string loc)
+
+  let mk_instr loc i = {
+      instr_d = i;
+      instr_info = pp_loc_info loc;
+    }
+
+        
+  let to_assgn env i =
+    let loc = loc i in
+    let i = data i in
     let xs = get_vcall env i.P.i_var in
     let mk_assgn x e = 
       set_init env x; 
-      Iassgn { i_var  = x; i_kind = i.P.i_kind; i_expr = e } in
+      mk_instr loc (Iassgn { i_var  = x; i_kind = i.P.i_kind; i_expr = e }) in
     match xs with
     | [x] -> [mk_assgn x (to_expr env i.P.i_expr)]
     | xs ->
@@ -353,25 +388,27 @@ module ToProg = struct
     let do1 x = 
       if E.Hv.mem o x then
         warning ~loc:(loc id) 
-          "the variable %a is used multiple time in function call %a, must leads to unexpected behavior" (pp_var false) x P.pp_ident id;
+          "the variable %a is used multiple time in function call %a, must leads to unexpected behavior" (pp_var ~full:dft_pinfo) x P.pp_ident id;
       E.Hv.replace o x () in
     let don = List.iter (List.iter do1) in
     don xss;
     don yss
     
   let to_macro env i = 
+    let loc = loc i in
+    let i = data i in
     let id = i.P.i_macro in
     let f = get_global env.globals id in
     let i_macro = f.f_name in
     let i_args = get_vcalls env id i.P.i_args f.f_in in
     let i_lhs = set_vcalls env id i.P.i_lhs f.f_out in
     check_disjoint id i_args i_lhs;
-    [Imacro { i_lhs; i_macro; i_args }]
+    [mk_instr loc (Imacro { i_lhs; i_macro; i_args })]
 
   let to_instr env i = 
-    match i with 
-    | P.Iassgn i -> to_assgn env i
-    | P.Imacro i -> to_macro env i
+    match (data i) with 
+    | P.Iassgn id -> to_assgn env (mkloc (loc i) id)
+    | P.Imacro id -> to_macro env (mkloc (loc i) id)
                   
   let set_rand env id = 
     let doit id =
@@ -442,16 +479,20 @@ module Process = struct
     | Eop(o, es)   -> Eop(o, List.map (rename_e s) es)
     | Ebox _       -> assert false
 
-  let rename_i s i = 
-    match i with
-    | Iassgn i ->
-      Iassgn { i with i_var = rename_var s i.i_var;
-                      i_expr = rename_e s i.i_expr }
-    | Imacro i ->
-      let rename_vcalls = List.map (List.map (rename_var s)) in
-      Imacro { i_lhs   = rename_vcalls i.i_lhs;
-               i_macro = i.i_macro;
-               i_args  = rename_vcalls i.i_args }
+  let rename_i ppi s ii = 
+    let d = 
+      match ii.instr_d with
+      | Iassgn i ->
+        Iassgn { i with i_var = rename_var s i.i_var;
+                        i_expr = rename_e s i.i_expr }
+      | Imacro i ->
+        let rename_vcalls = List.map (List.map (rename_var s)) in
+        Imacro { i_lhs   = rename_vcalls i.i_lhs;
+                 i_macro = i.i_macro;
+                 i_args  = rename_vcalls i.i_args } in
+    { instr_d = d;
+      instr_info = fun fmt () -> ppi fmt (); ii.instr_info fmt ();
+    }
 
   (* ------------------------------------------------------------------ *)
 
@@ -465,11 +506,12 @@ module Process = struct
     try Hashtbl.find env.ee_globals fname.E.v_name 
     with Not_found -> assert false 
                     
-  let macro_expand_call env i = 
+  let macro_expand_call ppi env i = 
     let func = get_macro env i.i_macro in
     let s = E.Hv.create 57 in
     let add x y = E.Hv.add s x y in
     let adds xs ys = List.iter2 add xs ys in
+    (* FIXME: public args ... *)
     List.iter2 adds (List.map snd func.f_in) i.i_args;
     List.iter2 adds func.f_out i.i_lhs;
     let add_clone x = let x' = E.V.clone x in add x x'; x' in
@@ -477,15 +519,15 @@ module Process = struct
     let add_other x = let x' = add_clone x in env.other <- x'::env.other in
     List.iter add_rnd func.f_rand;
     List.iter add_other func.f_other;
-    List.map (rename_i s) func.f_cmd
+    List.map (rename_i ppi s) func.f_cmd
     
   let rec macro_expand_c env c =
     match c with
     | [] -> []
-    | Iassgn _ as i :: c -> i :: macro_expand_c env c 
-    | Imacro i :: c ->
+    | { instr_d = Iassgn _ } as i :: c -> i :: macro_expand_c env c 
+    | { instr_d = Imacro i} as ii :: c ->
       let c = macro_expand_c env c in
-      let ic = macro_expand_call env i in
+      let ic = macro_expand_call ii.instr_info env i in
       ic@c
       
   let macro_expand_func globals func = 
@@ -524,7 +566,7 @@ let rec expr_of_pexpr e =
 let subst_v s x = 
   try E.Hv.find s x 
   with Not_found -> 
-    Format.eprintf "Can not find %a@." (pp_var true) x;
+    Format.eprintf "Can not find %a@." (pp_var ~full:dft_pinfo) x;
     assert false
 
 let rec subst_e s e = 
@@ -546,60 +588,88 @@ let fv =
     | Ebox e -> E.Se.add e fv in
   aux E.Se.empty
 
-let rec add_sub obs e = 
+type obs_info = Format.formatter -> unit -> unit
+
+type observation = obs_info E.He.t
+
+let add_observation obs e pp = 
+  if not (E.He.mem obs e) then
+    E.He.add obs e pp
+    
+let rec add_sub obs e pp = 
   match e with
   | Evar _ -> assert false
   | Eadd(e1,e2) -> 
-    let obs, e1 = add_sub obs e1 in
-    let obs, e2 = add_sub obs e2 in
+    let e1 = add_sub obs e1 pp in
+    let e2 = add_sub obs e2 pp in
     let e = E.add e1 e2 in
-    E.Se.add e obs, e 
+    add_observation obs e pp;
+    e
   | Emul(e1,e2) -> 
-    let obs, e1 = add_sub obs e1 in
-    let obs, e2 = add_sub obs e2 in
+    let e1 = add_sub obs e1 pp in
+    let e2 = add_sub obs e2 pp in
     let e = E.mul e1 e2 in
-    E.Se.add e obs, e
+    add_observation obs e pp;
+    e
   | Enot e      -> 
     (* For not we do not add !e, since the adversary can directly observe e *)
-    let obs, e = add_sub obs e in
-    obs, E.neg e 
+    let e = add_sub obs e pp in
+    E.neg e 
   | Eop(o,es) ->
-    let obs = ref obs in
-    let doit e = 
-      let os, e = add_sub !obs e in
-      obs := os; e in
+    let doit e = add_sub obs e pp in
     let es = List.map doit es in
-    !obs, E.op o (Array.of_list es)
+    let e = E.op o (Array.of_list es) in
+    add_observation obs e pp;
+    e
   | Ebox e ->
-    E.Se.add e obs, e
+    add_observation obs e pp;
+    e
  
-let add_glitch obs e =
-  E.Se.add (E.tuple_nodup (Array.of_list (E.Se.elements (fv e)))) obs
+let add_glitch obs e pp =
+  let e = E.tuple_nodup (Array.of_list (E.Se.elements (fv e))) in
+  add_observation obs e pp
 
-let rec build_obs obs s c = 
+
+let rec build_obs ~glitch obs s c = 
   match c with 
-  | [] -> obs
-  | Imacro _ :: _ -> assert false 
-  | Iassgn i :: c ->
+  | [] -> ()
+  | {instr_d = Imacro _} :: _ -> assert false 
+  | {instr_d = Iassgn i; instr_info = pp } :: c ->
     let e = subst_e s i.i_expr in
-    let obs, e = 
+    let pp fmt () = 
+      pp fmt (); 
+      Format.fprintf fmt "(* from @[%a@] *)@ " (pp_expr ~full:dft_pinfo) e in
+    let e = 
       match i.i_kind with
       | P.IK_sub ->
-        let obs, e = add_sub obs e in
-        obs, Ebox e
+        let e = add_sub obs e pp in
+        Ebox e
       | P.IK_glitch ->
-        let obs = add_glitch obs e in
-        let e = expr_of_pexpr e in
-        obs, Ebox e
+        if glitch then
+          begin
+            add_glitch obs e pp;
+            let e = expr_of_pexpr e in
+            Ebox e
+          end
+        else
+          let e = add_sub obs e pp in
+          Ebox e 
       | P.IK_hide -> 
         let e = expr_of_pexpr e in
-        let obs = E.Se.add e obs in
-        obs, Ebox e
+        add_observation obs e pp; 
+        Ebox e
       | P.IK_subst -> 
-        let obs = add_glitch obs e in
-        obs, e in
+        if glitch then 
+          begin
+            add_glitch obs e pp;
+            e 
+          end 
+        else 
+          let e = add_sub obs e pp in
+          Ebox e 
+    in
     E.Hv.replace s i.i_var e;
-    build_obs obs s c 
+    build_obs ~glitch obs s c 
       
 let sub_array es1 es2 = 
   let n1 = Array.length es1 in
@@ -659,7 +729,7 @@ let remove_subtuple obs =
   List.iter doit obs;
   E.Se.elements !robs
 
-let build_obs_func ~ni loc f =
+let build_obs_func ~ni ~glitch loc f =
   let nb_shares = ref 0 in
   let check_shares xs = 
     let xs = Array.of_list xs in
@@ -668,56 +738,81 @@ let build_obs_func ~ni loc f =
       error loc "not the same number of shares";
     xs in
   let s = E.Hv.create 101 in
-  let obs = ref E.Se.empty in 
+  let obs = E.He.create 1007 in 
   let add_subst x p = E.Hv.add s x (Ebox p) in
   let add_params (x, xs) = 
     let xs = check_shares xs in
     let mk_param i xi = 
-      let p = E.share x i in
+      let p = E.share x i xi in
+      let pp fmt () = 
+        Format.fprintf fmt "(* params %a *)@ " (pp_var ~full:dft_pinfo) xi in
       if ni <> `Threshold then 
-        obs := E.Se.add p !obs;
+        ignore (add_observation obs p pp);
       add_subst xi p in
     Array.iteri mk_param xs;
     x
   in
   (* Build the parameters and the substitution *) 
   let params = List.map add_params f.f_in in
-  let add_vars mk_e =   
+  let add_vars s mk_e =   
     let add x = 
+      let pp fmt () = 
+        Format.fprintf fmt "(* %s %a *)@ " s (pp_var ~full:dft_pinfo) x in
       let e = mk_e x in
-      obs := E.Se.add e !obs;
+      ignore (add_observation obs e pp);
       add_subst x e in
     List.iter add in
   (* Build the randoms *)
-  add_vars E.rnd f.f_rand;
+  add_vars "randoms" E.rnd f.f_rand;
   (* Build the public variables *)
-  add_vars E.pub f.f_pin; 
-  let obs = build_obs !obs s f.f_cmd in
+  add_vars "public" E.pub f.f_pin; 
+  build_obs ~glitch obs s f.f_cmd;
 
+  (* Add the observation on the output variables *)
+  let add_out out = 
+    List.map (fun x -> 
+        let e = expr_of_pexpr (subst_v s x) in
+        add_observation obs e 
+          (fun fmt () -> Format.fprintf fmt "(* output %a *)@ " 
+                           (pp_var ~full:dft_pinfo) x);
+        e) out in
+  let out = List.map add_out f.f_out in
+    
+  let all = 
+    E.He.fold (fun e _ interns -> E.Se.add e interns) obs E.Se.empty in
   let interns, out = 
     match ni with
-    | `Threshold -> obs, []
-    | `NI -> obs, []
+    | `Threshold -> all, []
+    | `NI -> all, []
     | `SNI -> 
       (* Compute the set of output *)
       let out = 
-        match f.f_out with
+        match out with
         | [] -> E.Se.empty 
-        | [out] ->
-          List.fold_left 
-            (fun obs x -> E.Se.add (expr_of_pexpr (subst_v s x)) obs)
-            E.Se.empty out 
+        | [out] -> E.Se.of_list out
         | _ -> 
           error loc 
             "the function %a has more that one output, do not known how to check SNI" 
             E.pp_var f.f_name in
       (* Remove out from the set of obs *)
-      E.Se.diff obs out, E.Se.elements out in 
+      E.Se.diff all out, E.Se.elements out in 
   (* We remove sub-tuples all projections of a tuples:
      i.e if (e1,e2,e3), e1, (e1,e3) are in the set we keep only (e1,e2,e3),
      since the adversary can directly observes (e1,e2,e3) to get e1 or (e1,e3)
    *)
   let interns = remove_subtuple interns in
+  (* Now build the list of Checker.expr_info *)
+  let pp_e pp e fmt () = 
+    pp fmt ();
+    Format.fprintf fmt "@[%a@]@ " E.pp_expr e in
+  let mk_ei e = 
+    { Checker.red_expr = e;
+      Checker.pp_info = 
+        try pp_e (E.He.find obs e) e with Not_found -> 
+          Format.eprintf "no info for %a@." E.pp_expr e;
+          assert false } in
+  let interns = List.map mk_ei interns in
+  let out     = List.map mk_ei out in
   (params, !nb_shares, interns, out) 
 
 
@@ -731,14 +826,22 @@ let threshold func =
     let i = { i_var = x;
               i_kind = P.IK_subst;
               i_expr = Evar r } in
-    init := Iassgn i :: !init;
+    let i = { 
+        instr_d = Iassgn i;
+        instr_info = fun fmt () -> Format.fprintf fmt "(* initial random share *)@ "
+      } in 
+    init := i :: !init;
     Evar x in
   let mk_shared x0 x es =
     let i =
       {i_var = x0;
        i_kind = P.IK_hide;
        i_expr = List.fold_left (fun e1 e2 -> Eadd(e1, e2)) (Evar x) es} in
-    init := Iassgn i :: !init in
+    let i = { 
+        instr_d = Iassgn i;
+        instr_info = fun fmt () -> Format.fprintf fmt "(* sum share share *)@ "
+      } in 
+    init := i :: !init in
   let init_input (x,xs) = 
     match xs with
     | [] -> assert false

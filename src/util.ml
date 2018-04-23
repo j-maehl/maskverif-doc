@@ -13,6 +13,11 @@ module List = struct
 
   let is_empty l = l == []
 
+  let rec equal f l1 l2 = 
+    match l1, l2 with
+    | [], [] -> true
+    | x1::l1, x2::l2 -> f x1 x2 && equal f l1 l2
+    | _, _ -> false 
 end
 
 let rec partition f lin lout l = 
@@ -118,8 +123,11 @@ module Stack = struct
     if top = len then begin
       let nlen = 2*len + 1 in
       let nbuff = Array.make nlen a in
-      Array.blit s.st_buff 0 nbuff 0 len 
+      Array.blit s.st_buff 0 nbuff 0 len;
+      s.st_buff <- nbuff
     end;
+    if not (0 <= top && top < Array.length s.st_buff) then
+      Format.eprintf "top = %i; len = %i@." top (Array.length s.st_buff);
     s.st_buff.(top) <- a;
     s.st_top <- top + 1
 
@@ -352,15 +360,59 @@ module HS = struct
 
   let compare s1 s2 = s1.hs_id - s2.hs_id
 
-  let empty = make ""
-
 end
 
   
-      
+let _DFF_PP0_   = HS.make "$_DFF_PP0_"
+let _DFFSR_PPP_ = HS.make "$_DFFSR_PPP_"
+let _DFF_PN0_    = HS.make "$_DFF_PN0_"
+
+let is_FF_op o = 
+  HS.equal o _DFF_PP0_ || HS.equal o _DFFSR_PPP_ || HS.equal o _DFF_PN0_
+
+let _TUPLE_     = HS.make ""     
 
     
+(* ----------------------------------------------------------------- *)
 
+let pp_z fmt z = 
+  let s = Z.to_string z in
+  let len = Bytes.length s in
+  let s' = 
+    let m = len mod 3 in
+    if m = 0 then ""
+    else Bytes.make (3 - m) '0' in
+
+  let s = s' ^ s in
+  let k = Bytes.length s / 3 in
+  for i = 0 to k - 1 do
+    for j = 0 to 2 do
+      Format.fprintf fmt "%c" s.[i*3 + j]
+    done;
+    if i <> k-1 then Format.fprintf fmt "," 
+  done
+
+let pp_human suffix fmt num =
+  let sfx = [| ""; "K"; "M"; "G"; "T"; "P"; "E"; "Z"; "Y" |] in
+  let idx = ref 0 in
+  let num = ref num in
+  let fcr = ref None in
+
+  while !idx < (Array.length sfx - 1) && Z.gt !num (Z.of_int 1000) do
+    fcr := Some (Z.rem !num (Z.of_int 1000));
+    num := Z.div !num (Z.of_int 1000);
+    idx := !idx + 1
+  done;
+  let suffix = sfx.(!idx) ^ suffix in
+
+  match !fcr with
+  | None ->
+      Format.fprintf fmt "%s %s" (Z.to_string !num) suffix
+  | Some fcr ->
+      Format.fprintf fmt "%s.%0.3d %s"
+        (Z.to_string !num) (Z.to_int fcr) suffix
+      
+ 
 
 
 

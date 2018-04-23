@@ -20,16 +20,16 @@ clean:
 	$(OCB) -clean; rm -f src/*~
 
 native: 
-	$(OCB) $(MAIN).native $(MAINPARSE).native 
+	$(OCB) -tag debug $(MAIN).native $(MAINPARSE).native 
 
 byte:
-	$(OCB) $(MAIN).byte
+	$(OCB) $(MAIN).byte $(MAINPARSE).byte
 
 profile:
-	$(OCB) -tag profile $(MAIN).native
+	$(OCB) -tag profile $(MAIN).native $(MAINPARSE).byte
 
 debug:
-	$(OCB) -tag debug $(MAIN).byte
+	$(OCB) -tag debug $(MAIN).byte $(MAINPARSE).byte
 
 test:	native
 	./$(MAIN).native 

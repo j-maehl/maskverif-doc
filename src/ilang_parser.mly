@@ -11,8 +11,9 @@
 %token <string>IDENT
 %token <int>INT
 %token <string>CONST
+%token PARAMETER
 
-%token WIRE INPUT OUTPUT WIDTH 
+%token WIRE INPUT OUTPUT WIDTH UPTO
 %token CELL
 %token CONNECT
 
@@ -73,14 +74,11 @@ wire_opt:
   | INPUT  i=INT { WO_input  i}
   | OUTPUT i=INT { WO_output i}
   | WIDTH  i=INT { WO_width  i}
-
-index:
-  | LBRACKET i=INT COLON j=INT RBRACKET { i,j }
-  | LBRACKET i=INT RBRACKET             { i,i }
+  | UPTO         { WO_upto    }
 
 connect_expr1:
-  | i=id_index   { Eid i }
-  | c=CONST      { Econst c }
+  | i=id_index        { Eid i }
+  | c=loc(CONST)      { Econst c }
 
 connect_exprn:
   | e=connect_expr1 { [e] }
@@ -89,6 +87,8 @@ connect_exprn:
 
 connect_expr:
   | e=connect_expr1                        { Rexpr e }
+  | x=ident LBRACKET i=INT COLON j=INT RBRACKET 
+    { Rvect (List.map (fun i -> Eid (x,Some i)) (mk_range_i i j)) }
   | LCURLY es=list(connect_exprn) RCURLY   { Rvect (List.flatten es) }
 
 c_connect:
@@ -100,17 +100,18 @@ cell:
      { cell_name1 = i1; cell_name2 = i2; cell_connect = cs } }
 
 connect:
-  | CONNECT x=ident i=index? rhs=connect_expr { 
-     { connect_lhs = (x,i); connect_rhs = rhs } }
+  | CONNECT lhs=connect_expr; rhs=connect_expr { 
+     { connect_lhs = lhs; connect_rhs = rhs } }
 
 decl:
   | WIRE o=list(wire_opt) x=ident  { Wire(o,x) }
+  | PARAMETER x=ident              { Parameter x }
   | c=cell                         { Cell c }
-  | c=connect                      { Connect c }
+  | c=loc(connect)                 { Connect c }
   | d=maskverif_decl               { Decl d }
 
 module1:
-  | MODULE x=ident ld=list(with_attribute(decl)) END { 
+  | MODULE x=ident ld=list(with_attribute(loc(decl))) END { 
     { mod_name = x; mod_decl = ld} }
 
 prog:

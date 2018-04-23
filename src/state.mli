@@ -35,7 +35,7 @@ val simplify : state -> bool
    First call (simplified_expr state) and then call the function 
    on expression (whithout modification of the state)
  *) 
-val simplified_expr : state -> expr -> expr 
+val simplified_expr : ?notfound:bool -> state -> expr -> expr 
 
 (* [simplify_until state k] 
    try to simplify the state until the top expression depend of at most 

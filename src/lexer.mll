@@ -26,8 +26,12 @@
     "NI"     , NI "";
     "SNI"    , SNI "";
     "Probing", PROBING "";
+    "print", PRINT "";
     "read_file" , READ_FILE "";
-    "read_ilang", READ_ILANG ""
+    "read_ilang", READ_ILANG "";
+    "para", PARA;
+    "noglitch", NOGLITCH;
+    "order", ORDER
   ]
 
   let keywords =
@@ -63,6 +67,7 @@ rule main = parse
                  | NI _         -> NI (to_string lexbuf)
                  | SNI _        -> SNI (to_string lexbuf) 
                  | PROBING _    -> PROBING (to_string lexbuf) 
+                 | PRINT _      -> PRINT (to_string lexbuf)
                  | READ_FILE _  -> READ_FILE (to_string lexbuf) 
                  | READ_ILANG _ -> READ_ILANG (to_string lexbuf) 
                  | _ -> token

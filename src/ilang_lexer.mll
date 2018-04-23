@@ -25,8 +25,10 @@
     "input"     , INPUT;
     "output"    , OUTPUT;
     "width"     , WIDTH;
+    "upto"      , UPTO;  
     "cell"      , CELL;
     "connect"   , CONNECT;
+    "parameter" , PARAMETER;
   ]
 
   let keywords =
