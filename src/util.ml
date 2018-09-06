@@ -1,3 +1,8 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2018 - Inria
+ *
+ * Distributed under the terms of the CeCILL-C-V1 license
+ * -------------------------------------------------------------------- *)
 (* ----------------------------------------------------------------------- *)
 module List = struct
   include List
@@ -17,7 +22,14 @@ module List = struct
     match l1, l2 with
     | [], [] -> true
     | x1::l1, x2::l2 -> f x1 x2 && equal f l1 l2
-    | _, _ -> false 
+    | _, _ -> false
+
+  let rec split n l =
+    if n <= 0 then ([], l) 
+    else match l with
+    | [] -> assert false
+    | x::l -> let (l1,l2) = split (n-1) l in (x::l1, l2)
+
 end
 
 let rec partition f lin lout l = 
@@ -362,10 +374,10 @@ module HS = struct
 
 end
 
-  
+let _DFF_P_     = HS.make "$_DFF_P_"
 let _DFF_PP0_   = HS.make "$_DFF_PP0_"
 let _DFFSR_PPP_ = HS.make "$_DFFSR_PPP_"
-let _DFF_PN0_    = HS.make "$_DFF_PN0_"
+let _DFF_PN0_   = HS.make "$_DFF_PN0_"
 
 let is_FF_op o = 
   HS.equal o _DFF_PP0_ || HS.equal o _DFFSR_PPP_ || HS.equal o _DFF_PN0_
@@ -412,7 +424,17 @@ let pp_human suffix fmt num =
       Format.fprintf fmt "%s.%0.3d %s"
         (Z.to_string !num) (Z.to_int fcr) suffix
       
- 
+
+(* ------------------------------------------------------------- *)
+let verbosity = ref 0 
+
+let set_verbose i = verbosity := i
+
+let fverbose i = 
+  if i <= !verbosity then Format.fprintf else Format.ifprintf
+
+let everbose i = fverbose i Format.err_formatter
+let verbose i = fverbose i Format.std_formatter
 
 
 

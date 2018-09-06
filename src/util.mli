@@ -1,3 +1,8 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2018 - Inria
+ *
+ * Distributed under the terms of the CeCILL-C-V1 license
+ * -------------------------------------------------------------------- *)
 module List : sig
     include module type of List
 
@@ -5,6 +10,7 @@ module List : sig
     val map_size : ('a -> 'b) -> 'a list -> 'b list * int
     val is_empty : 'a list -> bool
     val equal : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
+    val split : int -> 'a list -> 'a list * 'a list
   end
 
 val partition :
@@ -148,6 +154,7 @@ module HS : sig
 
 end
 
+val _DFF_P_ : HS.t
 val _DFF_PP0_ : HS.t
 val _DFF_PN0_ : HS.t
 val _DFFSR_PPP_ : HS.t
@@ -159,3 +166,9 @@ val _TUPLE_ : HS.t
 val pp_z : Format.formatter -> Z.t -> unit
 val pp_human : string -> Format.formatter -> Z.t -> unit
 
+(* --------------------------------------------------------- *)
+val fverbose : 
+  int -> Format.formatter -> ('a, Format.formatter, unit) format -> 'a
+val everbose : int -> ('a, Format.formatter, unit) format -> 'a
+val verbose  : int -> ('a, Format.formatter, unit) format -> 'a
+val set_verbose : int -> unit 

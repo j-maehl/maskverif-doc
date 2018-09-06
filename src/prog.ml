@@ -1,3 +1,8 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2018 - Inria
+ *
+ * Distributed under the terms of the CeCILL-C-V1 license
+ * -------------------------------------------------------------------- *)
 open Util
 
 module P = Parsetree
@@ -105,7 +110,7 @@ let pp_assgn ?(full=dft_pinfo) fmt i =
   | P.IK_sub ->
     Format.fprintf fmt "@[<hov 2> %a =@ %a@]" 
   | P.IK_glitch ->
-    Format.fprintf fmt "@[<hov 2> %a =@ [%a]@]" 
+    Format.fprintf fmt "@[<hov 2> %a =@ ![%a]@]" 
   end
      (pp_var ~full) i.i_var (pp_expr ~full) i.i_expr
 
@@ -296,13 +301,25 @@ module ToProg = struct
   let set_init env x = 
     env.init <- E.Sv.add x env.init 
     
-  let get_vcalls env id vcalls ins = 
+  let get_vcalls env id vcalls pins ins = 
+    let pl1 = List.length pins in
     let l1 = List.length ins in
     let l2 = List.length vcalls in
-    if l1 <> l2 then
+    if (pl1 + l1) <> l2 then
       error (loc id) 
         "the function %a expects %i arguments while %i are provided" 
-        P.pp_ident id l1 l2;
+        P.pp_ident id (pl1 + l1) l2;
+
+    let pub, vcalls = List.split pl1 vcalls in
+    let get_pub v = 
+      let xs = get_vcall env v in
+      let loc = P.vcall_loc v in
+      match xs with
+      | [_] -> xs
+      | _   -> error loc "shared variable not allowed here" in
+
+    let pub = List.map get_pub pub in
+ 
     let get_vcall v (_,in_) =
       let xs = get_vcall env v in
       let loc = P.vcall_loc v in
@@ -314,7 +331,9 @@ module ToProg = struct
           P.pp_vcall v l1 l2;
       check_init env loc xs;
       xs in
-    List.map2 (get_vcall) vcalls ins
+    let ins = List.map2 (get_vcall) vcalls ins in
+    pub @ ins
+
     
   let set_vcalls env id vcalls outs = 
     let l1 = List.length outs in
@@ -400,7 +419,7 @@ module ToProg = struct
     let id = i.P.i_macro in
     let f = get_global env.globals id in
     let i_macro = f.f_name in
-    let i_args = get_vcalls env id i.P.i_args f.f_in in
+    let i_args = get_vcalls env id i.P.i_args f.f_pin f.f_in in
     let i_lhs = set_vcalls env id i.P.i_lhs f.f_out in
     check_disjoint id i_args i_lhs;
     [mk_instr loc (Imacro { i_lhs; i_macro; i_args })]
@@ -512,7 +531,9 @@ module Process = struct
     let add x y = E.Hv.add s x y in
     let adds xs ys = List.iter2 add xs ys in
     (* FIXME: public args ... *)
-    List.iter2 adds (List.map snd func.f_in) i.i_args;
+    List.iter2 adds 
+      ((List.map (fun x -> [x]) func.f_pin) @ 
+       (List.map snd func.f_in)) i.i_args;
     List.iter2 adds func.f_out i.i_lhs;
     let add_clone x = let x' = E.V.clone x in add x x'; x' in
     let add_rnd x   = let x' = add_clone x in env.rnd <- x'::env.rnd in
@@ -625,11 +646,15 @@ let rec add_sub obs e pp =
     add_observation obs e pp;
     e
  
+let glitch_expr e = 
+  let els = Array.of_list (E.Se.elements (fv e)) in
+  if Array.length els = 1 then els.(0)
+  else E.tuple_nodup els 
+  
+  
 let add_glitch obs e pp =
-  let e = E.tuple_nodup (Array.of_list (E.Se.elements (fv e))) in
-  add_observation obs e pp
-
-
+  add_observation obs (glitch_expr e) pp
+   
 let rec build_obs ~glitch obs s c = 
   match c with 
   | [] -> ()
@@ -685,7 +710,11 @@ let sub_array es1 es2 =
         else aux i1 (i2+1) in
     aux 0 0
   
-let remove_subtuple obs = 
+let remove_subtuple pin obs = 
+  let pin = E.Se.of_list (List.map E.pub pin) in
+  (* Remove public inputs *)
+  let obs = E.Se.diff obs pin in
+  (* Remove subtuple *)
   let obs = E.Se.elements obs in
 (*  Format.printf "@[<v>possible observations:@ %a@]@." 
     (pp_list "@ " E.pp_expr) obs; *)
@@ -771,10 +800,14 @@ let build_obs_func ~ni ~glitch loc f =
   (* Add the observation on the output variables *)
   let add_out out = 
     List.map (fun x -> 
-        let e = expr_of_pexpr (subst_v s x) in
-        add_observation obs e 
-          (fun fmt () -> Format.fprintf fmt "(* output %a *)@ " 
-                           (pp_var ~full:dft_pinfo) x);
+        let e = subst_v s x in
+        let pp fmt () = 
+          Format.fprintf fmt "(* output %a *)@ " 
+            (pp_var ~full:dft_pinfo) x in
+        let e = 
+          if glitch then glitch_expr e 
+          else expr_of_pexpr e in
+        add_observation obs e pp;
         e) out in
   let out = List.map add_out f.f_out in
     
@@ -786,21 +819,33 @@ let build_obs_func ~ni ~glitch loc f =
     | `NI -> all, []
     | `SNI -> 
       (* Compute the set of output *)
-      let out = 
-        match out with
-        | [] -> E.Se.empty 
-        | [out] -> E.Se.of_list out
+      let out = List.map E.Se.of_list out in
+      let torm = List.fold_left E.Se.union E.Se.empty out  in
+(*        match out with
+        | [] -> [E.Se.empty] 
+        | [out] -> [E.Se.of_list out]
         | _ -> 
           error loc 
             "the function %a has more that one output, do not known how to check SNI" 
-            E.pp_var f.f_name in
+            E.pp_var f.f_name in *)
       (* Remove out from the set of obs *)
-      E.Se.diff all out, E.Se.elements out in 
+      E.Se.diff all torm, List.map E.Se.elements out in 
   (* We remove sub-tuples all projections of a tuples:
      i.e if (e1,e2,e3), e1, (e1,e3) are in the set we keep only (e1,e2,e3),
      since the adversary can directly observes (e1,e2,e3) to get e1 or (e1,e3)
    *)
-  let interns = remove_subtuple interns in
+  let pp_elems = 
+    verbose 2 "@[<v>%a@]@." (pp_list "@ " E.pp_expr) in
+
+  verbose 1 "number of internal observations = %i@." (E.Se.cardinal interns);
+  pp_elems (E.Se.elements interns);
+  let interns = remove_subtuple f.f_pin interns in
+  verbose 1 "after removing: number of internal observations = %i@." 
+    (List.length interns);
+  pp_elems interns;
+  let fout = List.flatten out in
+  verbose 1 "number of output observations = %i@." (List.length fout);
+  pp_elems fout;
   (* Now build the list of Checker.expr_info *)
   let pp_e pp e fmt () = 
     pp fmt ();
@@ -812,7 +857,8 @@ let build_obs_func ~ni ~glitch loc f =
           Format.eprintf "no info for %a@." E.pp_expr e;
           assert false } in
   let interns = List.map mk_ei interns in
-  let out     = List.map mk_ei out in
+  let out     = List.map (List.map mk_ei) out in
+  
   (params, !nb_shares, interns, out) 
 
 
