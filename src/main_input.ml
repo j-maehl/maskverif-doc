@@ -76,30 +76,32 @@ let process_check_opt os =
     order  = !order;
   }
 
+let mk_order o nb_shares = 
+  match o.order with
+  | None -> nb_shares - 1
+  | Some i -> i
+
 let check_ni f o = 
   let func = Prog.get_global globals f in
   Format.printf "Checking NI for %s:@." (data f);
   let (params, nb_shares, all, _) = 
     Prog.build_obs_func ~glitch:o.glitch ~ni:`NI (loc f) func in
 (*  Format.printf "@[<v>observations:@ %a@]@." Checker.pp_eis all; *)
-  let order = 
-    match o.order with
-    | None -> nb_shares - 1
-    | Some i -> i in
+  let order = mk_order o nb_shares in
   Checker.check_ni ~para:o.para ~fname:(data f) params ~order nb_shares all
 
 let check_threshold f o = 
   let func = Prog.get_global globals f in
-  let order = 
+  let nb_shares = 
     match func.Prog.f_in with
-    | (_,xs) :: _ -> List.length xs - 1 
+    | (_,xs) :: _ -> List.length xs 
     | _           -> assert false in
-  assert (0 < order);
   Format.printf "Checking Threshold for %s:@." (data f);
   let func = Prog.threshold func in
 (*  Format.printf "%a@." (Prog.pp_func ~full:Prog.var_pinfo) func; *)
   let (params, _, all, _) = 
     Prog.build_obs_func ~glitch:o.glitch ~ni:`Threshold (loc f) func in
+  let order = mk_order o nb_shares in
  (* Format.printf "@[<v>observations:@ %a@]@." Checker.pp_eis all; *)
   Checker.check_threshold ~para:o.para order params all
              
@@ -112,7 +114,8 @@ let check_sni f b o =
     Prog.build_obs_func ~glitch:o.glitch ~ni:`SNI (loc f) func in
 (*    Format.printf "@[<v>interns:@ %a@]@." Checker.pp_eis interns;
     Format.printf "@[<v>outputs:@ %a@]@." Checker.pp_eis outputs;  *)
-  Checker.check_sni ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares interns outputs 
+  let order = mk_order o nb_shares in
+  Checker.check_sni ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares ~order interns outputs 
   
 let pp_added func = 
   Format.printf "proc %s added@." func.Prog.f_name.Expr.v_name
@@ -136,6 +139,7 @@ let rec process_command c =
   | Print f -> 
     let func = Prog.get_global globals f in
     Format.printf "%a@." (Prog.pp_func ~full:Prog.dft_pinfo) func
+  | Verbose i -> Util.set_verbose (data i)
   | Exit -> 
     Format.eprintf "Bye bye!@.";
     exit 0
@@ -151,10 +155,17 @@ let main =
       let c = Parse.process_command () in
       process_command c
     with 
-      ParseError (l,s) -> 
+    | ParseError (l,s) -> 
       let s = match s with Some s -> s | None -> "" in
       Format.eprintf "Parse error at %s: %s@." (Location.to_string l) s;
       exit 1
+    | LexicalError (l,s) ->
+      let pp_loc fmt loc = 
+        match loc with
+        | None -> ()
+        | Some loc -> Format.fprintf fmt " at %s" (Location.to_string loc) in
+      Format.eprintf "Lexical error %a : %s@." pp_loc l s
+
     | Util.Error e ->
       Format.eprintf "%a@." Util.pp_error e
   done

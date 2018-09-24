@@ -69,6 +69,10 @@ module Poly(V:VAR) = struct
         | c when c < 0 -> raise NotDivisible
         | _ -> x1::div a' b
 
+    let divo a b =
+      try Some (div a b)
+      with NotDivisible -> None
+
     let rec divx a x = 
       match a with
       | [] -> raise NotDivisible
@@ -143,15 +147,31 @@ module Poly(V:VAR) = struct
          aux (add [m] q) (add a (mulm m b)) in
      aux zero a 
 
+   let div_eucl a b =
+     let db = 
+       match b with
+       | [] -> raise DivByZero
+       | db :: _ -> db in
+     let rec aux q a = 
+       match a with
+       | [] -> q, zero
+       | da :: _ ->
+         match M.divo da db with
+         | Some m ->
+           aux (add [m] q) (add a (mulm m b))
+         | None ->
+           q, a in
+     aux zero a
+           
    let divx a x =
      let q = ref [] in
      let r = ref [] in
      let rec aux = function
        | [] -> ()
        | m::a ->
-         aux a;
-         try q := M.divx m x :: !q
-         with NotDivisible -> r := m :: !r in
+         (try q := M.divx m x :: !q
+          with NotDivisible -> r := m :: !r);
+         aux a in
      aux a;
      !q, !r
 
@@ -171,6 +191,18 @@ module Poly(V:VAR) = struct
        Some (p1, p2)
      with NotDivisible -> None
 
+   (* [check_rnd_eucl r p] return (p1,p2,p3) such that p = (r + p1) * p2 + p3.
+      r will not occur in p1 p2 p3.
+      r should occur in p *)
+   let check_rnd_eucl r p = 
+       let p2, pr = divx p r in (* p = p2 * r + pr *)
+       (* div_eucl pr p2 = (p1, p3) ->
+          pr = p1 * p2 + p3  ->
+          p = r * p2 + p1 * p2 + p3 ->
+          p = (r + p1) * p2 + p3 *)
+       let p1,p3 = div_eucl pr p2 in
+       (p1, p2, p3)
+     
    let dependx x p = 
      List.exists (M.dependx x) p
 
@@ -190,6 +222,31 @@ module Poly(V:VAR) = struct
      List.fold_left (fun r m ->
          let rm = M.eval rho m in
            (r && not rm) || (not r && r)) false p
+
+   let deg p = 
+     List.fold_left (fun d m -> max d (List.length m)) 0 p
+
+
+   let rec inter p1 p2 = 
+     match p1, p2 with
+     | [], _ -> []
+     | _, [] -> []
+     | m1::p1', m2::p2' ->
+       match M.compare m1 m2 with
+       | 0 -> m1 :: inter p1' p2' 
+       | c when c < 0 -> inter p1 p2'
+       | _ -> inter p1' p2 
+
+   let rec diff p1 p2 = 
+     match p1, p2 with
+     | [], _ -> []
+     | _, [] -> p1
+     | m1::p1', m2::p2' ->
+       match M.compare m1 m2 with
+       | 0 -> diff p1' p2' 
+       | c when c < 0 -> m2 :: diff p1 p2'
+       | _ -> m1 :: diff p1' p2 
+
 end
 
 

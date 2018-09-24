@@ -80,6 +80,7 @@ module OrderedInt = struct
   let compare x y = x - y
 end
 
+module Sint = Set.Make(OrderedInt)
 module Mint = Map.Make(OrderedInt)
 
 (* ----------------------------------------------------------------------- *)

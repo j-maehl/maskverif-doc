@@ -341,12 +341,17 @@ let apply_bij state r =
   Stack.push state.s_bij (r,c);
   if (is_rnd_for_bij c) then Stack.push state.s_todo c
                     
+exception Simplify1Done
+
 let rec simplify1 state = 
   try 
-    let r = Stack.pop state.s_todo in
-    if is_rnd_for_bij r then (apply_bij state r; true)
-    else simplify1 state
+    while true do
+      let r = Stack.pop state.s_todo in
+      if is_rnd_for_bij r then (apply_bij state r; raise Simplify1Done)
+    done;
+    true
   with EmptyStack -> false 
+     | Simplify1Done -> true
 
 let simplify state = 
   let rec aux state res = 

@@ -5,9 +5,9 @@
 
 %}
 %token PROC END PUBLIC INPUTS OUTPUTS SHARES RANDOMS
-%token <string>SNI NI PROBING PRINT
+%token <string>SNI NI PROBING PRINT 
 %token <string>READ_FILE READ_ILANG
-%token NOGLITCH PARA ORDER
+%token NOGLITCH PARA ORDER VERBOSE
 %token <string> IDENT
 %token <int> INT
 %token LPAREN
@@ -156,9 +156,10 @@ command1:
   | o=check_opt* f=loc(NI)               { NI (f,o) }
   | o=check_opt* b=sni_bound? f=loc(SNI) { SNI (f,b,o) }
   | o=check_opt* f=loc(PROBING)          { Probing (f,o) }
-  | f=loc(READ_FILE)  { Read_file f  }
-  | f=loc(READ_ILANG) { Read_ilang f }
-  | f=loc(PRINT)      { Print f }
+  | f=loc(READ_FILE)                     { Read_file f  }
+  | f=loc(READ_ILANG)                    { Read_ilang f }
+  | f=loc(PRINT)                         { Print f }
+  | VERBOSE i=loc(INT)                   { Verbose i }
   | error             { parse_error (Location.make $startpos $endpos) None }
 
 command:

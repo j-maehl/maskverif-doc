@@ -56,6 +56,7 @@ end = struct
     
   let cons n l p tl = 
     let cnp = cnp n p in
+    assert (0 < n);
     { n; l; p; cnp; c = Z.mul cnp (cnp_ldfs tl)} ::  tl
 
   let lfirst ldfs = 
@@ -81,7 +82,7 @@ end = struct
     set_top_exprs2 state ldfs;
     init_todo state;
     let res = simplify_until state maxparams in
-    if res then (* Not need to do more work just return *)
+    if res then (* No need to do more work just return *)
       false, ldfs
     else 
       let simple = simplified_expr state in
@@ -105,23 +106,42 @@ let print_error fmt lhd =
     pp_eis lhd
     (pp_list ",@ " (fun fmt ei -> pp_expr fmt ei.red_expr)) lhd
 
-let find_bij n state maxparams ldfs =
+let find_bij _n state maxparams ldfs =
   let lhd = L.lfirst ldfs in
   clear_state state;
   L.set_top_exprs state lhd;
   init_todo state;
   if not (simplify_until state maxparams) then 
     let simple = simplified_expr ~notfound:true state in
-    let lhd = List.map (fun ei -> { ei with red_expr = simple ei.red_expr}) lhd in    
-    Format.eprintf "Cannot check use boolean checking: %a tuples done@." pp_z n;
-    let es = List.map (fun ei -> ei.red_expr) lhd in
-    let e = Expr.tuple (Array.of_list es) in
-    try 
-      Expr.check_bool e;
-      let ein = Se.of_list es in
-      let is_in ei = Se.mem (simple ei.red_expr) ein in 
-      List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
-    with Expr.CheckBool -> raise (CanNotCheck lhd)
+    let lhd = 
+      List.map (fun ei -> { ei with red_expr = simple ei.red_expr}) lhd in    
+   
+    let es = 
+      List.map (fun ei -> ei.red_expr) lhd in
+    let other = 
+      List.map 
+        (fun ldf -> List.map (fun ei -> simple ei.red_expr) ldf.L.l)
+      ldfs
+    in
+(*    Format.eprintf "Cannot check using graph, try to use gauzz@."; *)
+    Format.eprintf "."; Format.pp_print_flush Format.err_formatter (); 
+
+    let etbl = 
+      try Pexpr.check_indep maxparams es other 
+      with Pexpr.Depend ->
+        if maxparams = 0 then
+          begin
+            Format.eprintf "Cannot check using gauzz, try to compute distr@.";
+            try 
+              Expr.check_bool (tuple (Array.of_list es));
+              let etbl = He.create 101 in
+              List.iter (fun e -> He.replace etbl e ()) es;
+              etbl
+            with Expr.CheckBool -> raise (CanNotCheck lhd)
+          end
+        else raise (CanNotCheck lhd) in
+    let is_in ei = He.mem etbl (simple ei.red_expr) in
+    List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
   else
     let used_share = used_share state in
     L.set_top_exprs2 state ldfs;
@@ -137,13 +157,16 @@ let check_all state maxparams (ldfs:L.ldfs) =
   let tdone = ref Z.zero in
   let count = ref 0 in
   let t0 = Sys.time () in
+  let pp_z = pp_human "" in
   let rec check_all state maxparams (ldfs:L.ldfs) = 
     incr count;    
-    if !count land 0x3FFFF = 0 then 
+    if !count land 0x3FF = 0 then 
       Format.eprintf "%a tuples checked over %a in %.3f@."
         pp_z !tdone pp_z to_check (Sys.time () -. t0);
 
+
     let continue, ldfs = L.simplify_ldfs state maxparams ldfs in
+
     if continue then 
       let split = find_bij !tdone state maxparams ldfs in
       let rec aux (accu:L.ldfs) split (ldfs:L.ldfs) = 
@@ -339,12 +362,10 @@ let check_threshold ?(para=false) ?fname order params all =
   with CanNotCheck le ->
     Format.eprintf "%a@." pp_fail (fname,"t-threshold secure",le)
 
-let check_fni ?(para = false) ?fname s f params nb_shares ?from ?to_ interns outs =
+let check_fni ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ interns outs =
   try 
     let len_i = List.length interns in
-    let len_o = List.length outs in
     let state = init_state nb_shares params in
-    let order = nb_shares - 1 in  
     let mk_bound dft = function
       | None -> dft 
       | Some i -> i in
@@ -354,11 +375,28 @@ let check_fni ?(para = false) ?fname s f params nb_shares ?from ?to_ interns out
       error "check_fni" None "invalid range";
 
     let check = check_all_opt ~para in
+    (* First compute the number of tuples *)
+    let total = ref Z.zero in
+    let outs = List.map (fun l -> List.length l, l) outs in
+    let mk_out ko = 
+      List.fold_left (fun ldfs (len_o, out) ->
+          let ko = if ko <= len_o then ko else len_o in
+          L.cons ko out len_o ldfs) [] outs in
+    for ki = from to to_ do
+      let ko = order - ki in
+      if ki <= len_i then
+         let args = if ko = 0 then [] else mk_out ko in 
+         let args = if ki = 0 then args else L.cons ki interns len_i args in
+         let to_check = L.cnp_ldfs args in
+         total := Z.add !total to_check;
+    done;
+    let pp_z = pp_human "" in
+    verbose 1 "total number of tuple to check = %a@." pp_z !total;
     for ki = from to to_ do
       let ko = order - ki in
       Format.eprintf "Start checking of ki = %i, ko = %i@." ki ko;
-      (if ki <= len_i && ko <= len_o then
-         let args = if ko = 0 then [] else L.cons ko outs len_o [] in
+      (if ki <= len_i then
+         let args = if ko = 0 then [] else mk_out ko in
          let args = if ki = 0 then args else L.cons ki interns len_i args in
          check state (f ki ko) args);
       Format.eprintf "Checking of ki = %i, ko = %i done@." ki ko;

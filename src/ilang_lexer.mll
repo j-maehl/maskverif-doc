@@ -47,7 +47,7 @@ let lower   = ['a'-'z']
 let letter  = upper | lower
 let digit   = ['0'-'9']
 let uint    = digit+
-let other   = '.' | '[' | ']' | ':' | '$' | '\\' | '_'
+let other   = '.' | '[' | ']' | ':' | '$' | '\\' | '_' | '<' | '>'
 let ident_start = '$' | '\\'
 let ident = 
   ident_start (letter | digit | other)*  
@@ -73,7 +73,9 @@ rule main = parse
   | ":"         { COLON }
   | "1'0" as c  { CONST c }
   | "1'1" as c  { CONST c }
+  | "1'x" as c  { CONST c }
   | eof         { EOF }
+  |  _         as c { lex_error lexbuf (Printf.sprintf "illegal character: %c" c) }
 
 and comment = parse
   | newline     { Lexing.new_line lexbuf }

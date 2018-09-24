@@ -57,7 +57,8 @@ type decl =
   | Input  of ident option * shares
   | Output of shares 
   | Random of id_index list
-  | Public of id_index list
+  | InpPub of id_index list
+  | OutPub of id_index list
 
 type mod_decl = 
   | Parameter of ident 

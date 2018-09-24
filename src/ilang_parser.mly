@@ -57,7 +57,8 @@ maskverif_decl:
   | SHARPSHARP INPUT  x=name_decl? s=share_decl  { Input (x,s) }
   | SHARPSHARP OUTPUT s=share_decl           { Output s }
   | SHARPSHARP RANDOM xs=id_index*           { Random xs }
-  | SHARPSHARP PUBLIC xs=id_index*           { Public xs }
+  | SHARPSHARP PUBLIC xs=id_index*           { InpPub xs }
+  | SHARPSHARP PUBLIC OUTPUT xs=id_index*    { OutPub xs }
 
 attribute_arg:
   | i=INT    { AA_int i }

@@ -59,7 +59,12 @@ val add   : expr -> expr -> expr
 val mul   : expr -> expr -> expr 
 val op    : operator -> expr array -> expr
 val tuple : expr array -> expr
+val efalse : expr
+val etrue  : expr
+
 val is_op_tuple : operator -> bool
+val is_rnd      : expr -> bool
+
 
 (* [unsafe_op b es]: [b] should be true only if [es] has no duplicate *)
 val unsafe_op : bool -> operator -> expr array -> expr
@@ -80,7 +85,5 @@ type result =
   | Rb of bool
   | Rtuple of result array 
 
-exception CheckBool 
-(* of expr list * (result,int) Hashtbl.t * (result,int) Hashtbl.t * bool He.t *)
-
+exception CheckBool
 val check_bool : expr -> unit

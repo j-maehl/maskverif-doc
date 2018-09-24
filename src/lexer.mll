@@ -31,7 +31,8 @@
     "read_ilang", READ_ILANG "";
     "para", PARA;
     "noglitch", NOGLITCH;
-    "order", ORDER
+    "order", ORDER;
+    "verbose", VERBOSE
   ]
 
   let keywords =
@@ -93,6 +94,7 @@ rule main = parse
   | ">>"        { LSR }
   | "<<"        { LSL }
   | eof         { EOF }
+  |  _         as c { lex_error lexbuf (Printf.sprintf "illegal character: %c" c) }
 
 and read_blank_string buf = parse 
   | blank       { read_blank_string buf lexbuf }

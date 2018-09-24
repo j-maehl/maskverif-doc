@@ -35,6 +35,7 @@ val pp_list : ('a, 'b, 'c, 'd, 'd, 'a) format6 -> 'a pp -> 'a list pp
 
 
 (* ----------------------------------------------------------------------- *)
+module Sint : Set.S with type elt = int
 module Mint : Map.S with type key = int
 module Mstr : Map.S with type key = string
 

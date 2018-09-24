@@ -176,6 +176,11 @@ let tuple es = op _TUPLE_ es
 
 let etrue = op (HS.make "1'1") [||]
 let efalse = op (HS.make "1'0") [||]
+
+let is_rnd e = 
+  match e.e_node with
+  | Ernd _ -> true
+  | _      -> false
   
 (* --------------------------------------------------------------------- *)
 let pp_expr fmt e =
@@ -414,7 +419,7 @@ let check_bool e =
   (* compute the params and the randoms *)
   let hp = He.create 10 in
   let hr = He.create 100 in
-(*  Format.eprintf "Start boolean checking %a@." pp_expr e; *)
+  Format.eprintf "Start boolean checking %a@." pp_expr e; 
   let rec aux e = 
     match e.e_node with
     | Etop -> assert false
@@ -479,207 +484,5 @@ let check_bool e =
         He.replace hr p false; check_p ps in
   check_p ps;
   Format.eprintf "@."
-
-
-(* ---------------------------------------------------------- *)
-
-let extract_subexpr e = 
-  let tbl = He.create 100 in
-  let rec extract_pol e = 
-    try He.find tbl e 
-    with Not_found ->
-      let e' =
-        match e.e_node with
-        | Etop | Ernd _ | Eshare _ | Epub _ -> e
-        | Eneg e -> add etrue (extract_pol e)
-        | Eadd (e1,e2) -> add (extract_pol e1) (extract_pol e2)
-        | Emul (e1,e2) -> mul (extract_pol e1) (extract_pol e2)
-        | Eop (_, o, es) ->
-          if is_FF_op o then extract_pol es.(1)
-          else 
-            if E.equal e etrue || E.equal e efalse then e
-            else assert false in
-      He.add tbl e e';
-      e'
-  in
-  let rec aux s e = 
-    match e.e_node with
-    | Eop(_, o, es) when is_op_tuple o ->
-      Array.fold_left aux s es 
-    | _ -> Se.add (extract_pol e) s in
-  aux Se.empty e
-
-module P = Poly.Poly(E)
-
-let is_vpub e =
-  match e.e_node with
-  | Etop | Epub _ -> true
-  | _ -> false 
-
-let is_pub = P.all_vars is_vpub
-
-let to_pols =
-  let tbl = He.create 1007 in
-  let rec aux e = 
-    try He.find tbl e 
-    with Not_found ->
-      let p =
-        match e.e_node with
-        | Etop | Ernd _ | Eshare _ | Epub _ -> P.var e
-        | Eneg _ -> assert false
-        | Eadd (e1,e2) -> P.add (aux e1) (aux e2) 
-        | Emul (e1,e2) -> P.mul (aux e1) (aux e2) 
-        | Eop (_, _, _) ->
-          if E.equal e efalse then P.zero
-          else if E.equal e etrue then P.one
-          else assert false in
-      He.add tbl e p;
-      p in
-  fun s -> 
-    Se.fold (fun e ps -> 
-      let p = aux e in
-      if is_pub p then ps else p :: ps) s []
-
-let rnd_pols ps = 
-  let is_rnd e = match e.e_node with Ernd _ -> true | _ -> false in
-  let rnd_pol = 
-    P.fold_vars (fun rs v -> if is_rnd v then Se.add v rs else rs)
-       in
-  List.fold_left rnd_pol Se.empty ps 
-
-let find_rnd r ps =
-  let rec aux1 p1 res ps = 
-    match ps with
-    | [] -> res
-    | p::ps -> 
-      if P.dependx r p then
-        match P.check_rnd p r with
-        | Some (p1',p2) -> 
-          if P.equal p1 p1' then aux1 p1 (p2::res) ps
-          else raise Not_found
-        | None -> raise Not_found
-      else aux1 p1 (p::res) ps in
-  let rec aux2 res ps =
-    match ps with
-    | [] -> res 
-    | p::ps ->
-      if P.dependx r p then
-        match P.check_rnd p r with
-        | Some (p1,p2) -> aux1 p1 (p2::res) ps
-        | None -> raise Not_found
-      else aux2 (p::res) ps in
-  aux2 [] ps
-
-let find_rnds rs ps = 
-  let rec aux rs1 rs2 = 
-    match rs2 with
-    | [] -> None 
-    | r::rs2 ->
-      try 
-        let ps = find_rnd r ps in
-        Some (List.rev_append rs1 rs2, ps)
-      with Not_found -> aux (r::rs1) rs2 in
-  aux [] rs 
-
-let not_secret e = 
-  match e.e_node with
-  | Eshare _ -> false
-  | _ -> true
-
-let check_secret ps = 
-  List.for_all (P.all_vars not_secret) ps
-
-let pp_mon fmt m = 
-  Format.fprintf fmt "@[%a@]" (pp_list "*" pp_expr) m
-let pp_pol fmt p =  
-  Format.fprintf fmt "@[<h>%a@]" (pp_list "+@ " pp_mon) p
-
-let check_distr pols = 
-  let hp = He.create 40 in
-  let hr = He.create 50 in
-  let add e = 
-    match e.e_node with
-    | Ernd _ -> He.replace hr e true
-    | Eshare _ -> He.replace hp e true
-    | _ -> assert false in
-  List.iter (P.iter_vars add) pols;
-  let ps = He.fold (fun e _ es -> e::es) hp [] in
-  let rs = He.fold (fun e _ es -> e::es) hr [] in
-  let get tbl e = try Hashtbl.find tbl e with Not_found -> 0 in
-  let lps, lrs = List.length ps, List.length rs in
-  Format.eprintf "Start check_distr ps = %i; rs = %i@." lps lrs;
-  let rho e = try He.find hp e with Not_found -> assert false in
-  let eval_ps () = List.map (P.eval rho) pols in
-  let check_r rs = 
-    Format.eprintf ".";Format.pp_print_flush Format.err_formatter ();
-    let rtbl = Hashtbl.create 100 in
-    let add res = Hashtbl.replace rtbl res (get rtbl res + 1) in
-    let rec check_r rs = 
-      match rs with
-      | [] -> add (eval_ps ())
-      | r::rs -> 
-        He.replace hp r true; check_r rs;
-        He.replace hp r false; check_r rs in
-    check_r rs;
-    rtbl in
-  let ttbl = check_r rs in
-  let check_tbl rtbl = 
-    let check_tr e n =
-      if n <> get rtbl e then 
-        raise CheckBool (* (ps,ttbl,rtbl, env) *) in
-    Hashtbl.iter check_tr ttbl;
-    let check_rt e n = 
-      if n <> get ttbl e then 
-        raise CheckBool (* (ps,ttbl,rtbl, env) *) in
-    Hashtbl.iter check_rt rtbl in
-  let rec check_p ps = 
-    match ps with
-    | [] -> check_tbl (check_r rs) 
-    | p::ps -> 
-        He.replace hp p true; check_p ps;
-        He.replace hp p false; check_p ps in
-  check_p ps;
-  Format.eprintf "@."
-
-  
-let rec pol_to_expr xs p =
-  if P.equal p P.zero then efalse
-  else if P.equal p P.one then etrue 
-  else match xs with
-  | [] -> assert false 
-  | x::xs ->
-    let q,r = P.divx p x in
-    let e1 = pol_to_expr xs q in
-    let e2 = pol_to_expr xs r in
-    add (mul x e1) e2
-
-let check_distr pols = 
-  (* Format.eprintf "@[<v>%a@]@." (pp_list "@ " pp_pol) pols; *)
-  let hx = He.create 40 in
-  let add e = 
-    match e.e_node with
-    | Ernd _ | Eshare _ -> He.replace hx e true
-    | _ -> () in
-  List.iter (P.iter_vars add) pols;
-  let xs = He.fold (fun e _ es -> e::es) hx [] in
-  let es = List.map (pol_to_expr xs) pols in
-  check_bool (tuple (Array.of_list es))
-
-
-let check_bool e =
-  (* create the list of expressions *)
-(*  Format.eprintf "check_bool %a@." pp_expr e; *)
-  let es = extract_subexpr e in
-  let ps = to_pols es in
-  let rs = Se.elements (rnd_pols ps) in
-  Format.eprintf "check_bool rs = %i@." (List.length rs);
-  let rec reduce rs ps = 
-    Format.eprintf "reduce@.";
-   (* Format.eprintf "@[<v>%a@]@." (pp_list "@ " pp_pol) ps; *)
-    if check_secret ps then Format.eprintf "check_bool done by reduction@."
-    else match find_rnds rs ps with
-    | None -> check_bool e 
-    | Some (rs, ps) -> reduce rs ps in
-  reduce rs ps 
 
 

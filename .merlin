@@ -1,9 +1,8 @@
-S src
-B _build/src
+S   src
+
+B   _build/src
 
 PKG zarith
-PKG unix
+PKG menhirLib
+PKG ocamlgraph 
 
-FLG -rectypes
-FLG -thread
-FLG -w Y -w Z -w -23 -w +28 -w +33
