@@ -86,4 +86,4 @@ type result =
   | Rtuple of result array 
 
 exception CheckBool
-val check_bool : expr -> unit
+val check_bool : Util.tool_opt -> expr -> unit

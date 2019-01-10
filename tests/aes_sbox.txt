@@ -1,2 +1,2 @@
 read_ilang tests/aes_sbox.ilang
-Probing \aes_sbox
+NI \aes_sbox

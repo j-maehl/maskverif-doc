@@ -57,23 +57,29 @@ open Checker
 let globals = Hashtbl.create 107
 
 type check_opt = {
-   glitch : bool;
-   para   : bool;
-   order  : int option;
+   glitch    : bool;
+   para      : bool;
+   order     : int option;
+   option    : Util.tool_opt;
   }
 
 let process_check_opt os = 
   let glitch = ref true in
   let para = ref false in
   let order = ref None in
+  let bool = ref true in
+  let print = ref true in
   let doit = function
     | NoGlitch -> glitch := false 
     | Para -> para := true
-    | Order n -> order := Some n in
+    | Order n -> order := Some n
+    | NoBool -> bool := false 
+    | NoPrint -> print := false in
   List.iter doit os;
   { glitch = !glitch;
     para   = !para;
     order  = !order;
+    option = { pp_error = !print; checkbool = !bool; };
   }
 
 let mk_order o nb_shares = 
@@ -88,7 +94,7 @@ let check_ni f o =
     Prog.build_obs_func ~glitch:o.glitch ~ni:`NI (loc f) func in
 (*  Format.printf "@[<v>observations:@ %a@]@." Checker.pp_eis all; *)
   let order = mk_order o nb_shares in
-  Checker.check_ni ~para:o.para ~fname:(data f) params ~order nb_shares all
+  Checker.check_ni ~para:o.para ~fname:(data f) o.option params ~order nb_shares all
 
 let check_threshold f o = 
   let func = Prog.get_global globals f in
@@ -103,7 +109,7 @@ let check_threshold f o =
     Prog.build_obs_func ~glitch:o.glitch ~ni:`Threshold (loc f) func in
   let order = mk_order o nb_shares in
  (* Format.printf "@[<v>observations:@ %a@]@." Checker.pp_eis all; *)
-  Checker.check_threshold ~para:o.para order params all
+  Checker.check_threshold o.option ~para:o.para order params all
              
 let check_sni f b o =
   let from, to_ = 
@@ -115,7 +121,7 @@ let check_sni f b o =
 (*    Format.printf "@[<v>interns:@ %a@]@." Checker.pp_eis interns;
     Format.printf "@[<v>outputs:@ %a@]@." Checker.pp_eis outputs;  *)
   let order = mk_order o nb_shares in
-  Checker.check_sni ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares ~order interns outputs 
+  Checker.check_sni o.option ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares ~order interns outputs 
   
 let pp_added func = 
   Format.printf "proc %s added@." func.Prog.f_name.Expr.v_name

@@ -73,6 +73,8 @@ type checker_option =
   | Order of int 
   | NoGlitch
   | Para
+  | NoBool
+  | NoPrint
 
 type checker_options = checker_option list
 

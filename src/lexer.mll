@@ -31,6 +31,8 @@
     "read_ilang", READ_ILANG "";
     "para", PARA;
     "noglitch", NOGLITCH;
+    "nobool", NOBOOL;
+    "noprint", NOPRINT;
     "order", ORDER;
     "verbose", VERBOSE
   ]

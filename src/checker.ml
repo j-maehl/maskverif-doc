@@ -101,15 +101,18 @@ exception CanNotCheck of expr_info list
 let pp_eis fmt = 
   pp_list "" (fun fmt ei -> ei.pp_info fmt ()) fmt 
 
-let print_error fmt lhd = 
-  Format.fprintf fmt "@[<v>Cannot check@ %a@ reduce to@ %a@]"
-    pp_eis lhd
-    (pp_list ",@ " (fun fmt ei -> pp_expr fmt ei.red_expr)) lhd
+let print_error opt fmt lhd = 
+  Format.fprintf fmt "@[<v>Cannot check@ ";
+  if opt.pp_error then 
+    Format.fprintf fmt "%a@ reduce to@ %a"
+      pp_eis lhd
+      (pp_list ",@ " (fun fmt ei -> pp_expr fmt ei.red_expr)) lhd;
+  Format.fprintf fmt "@]"
 
-let find_bij _n state maxparams ldfs =
+let find_bij opt _n state maxparams ldfs =
   let lhd = L.lfirst ldfs in
   clear_state state;
-  L.set_top_exprs state lhd;
+  L.set_top_exprs state lhd;  
   init_todo state;
   if not (simplify_until state maxparams) then 
     let simple = simplified_expr ~notfound:true state in
@@ -129,18 +132,18 @@ let find_bij _n state maxparams ldfs =
     let etbl = 
       try Pexpr.check_indep maxparams es other 
       with Pexpr.Depend ->
-        if maxparams = 0 then
+        if opt.checkbool && maxparams = 0 then
           begin
             Format.eprintf "Cannot check using gauzz, try to compute distr@.";
             try 
-              Expr.check_bool (tuple (Array.of_list es));
+              Expr.check_bool opt (tuple (Array.of_list es));
               let etbl = He.create 101 in
               List.iter (fun e -> He.replace etbl e ()) es;
               etbl
             with Expr.CheckBool -> raise (CanNotCheck lhd)
           end
         else raise (CanNotCheck lhd) in
-    let is_in ei = He.mem etbl (simple ei.red_expr) in
+    let is_in ei = He.mem etbl (simple ei.red_expr) in 
     List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
   else
     let used_share = used_share state in
@@ -148,10 +151,10 @@ let find_bij _n state maxparams ldfs =
     clear_bijection state;    
     init_todo state;
     simplify_until_with_clear state used_share maxparams;
-    let is_in ei = is_top_expr state ei.red_expr in
+    let is_in ei = is_top_expr state ei.red_expr in 
     List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
  
-let check_all state maxparams (ldfs:L.ldfs) = 
+let check_all opt state maxparams (ldfs:L.ldfs) = 
   let to_check = L.cnp_ldfs ldfs in
   Format.eprintf "%a tuples to check@." pp_z to_check;
   let tdone = ref Z.zero in
@@ -168,7 +171,7 @@ let check_all state maxparams (ldfs:L.ldfs) =
     let continue, ldfs = L.simplify_ldfs state maxparams ldfs in
 
     if continue then 
-      let split = find_bij !tdone state maxparams ldfs in
+      let split = find_bij opt !tdone state maxparams ldfs in
       let rec aux (accu:L.ldfs) split (ldfs:L.ldfs) = 
         match split, ldfs with
         | [], [] -> tdone := Z.add !tdone (L.cnp_ldfs accu)
@@ -204,7 +207,7 @@ let check_all state maxparams (ldfs:L.ldfs) =
 
 exception Done
 
-let check_all_para state maxparams (ldfs:L.ldfs) = 
+let check_all_para opt state maxparams (ldfs:L.ldfs) = 
   let pipe   = Unix.pipe () in
   let tdone  = Shrcnt.create "/masking.para.tdone" in
   let tprcs  = Shrcnt.create "/masking.para.tprcs" in
@@ -262,7 +265,7 @@ let check_all_para state maxparams (ldfs:L.ldfs) =
             end;
 
           if not !goup then begin
-            let split = find_bij Z.zero state maxparams ldfs in
+            let split = find_bij opt Z.zero state maxparams ldfs in
             let rec aux accu split ldfs = 
               match split, ldfs with
               | [], [] ->
@@ -293,7 +296,7 @@ let check_all_para state maxparams (ldfs:L.ldfs) =
          check_all state maxparams ldfs; raise Done
        with
        | CanNotCheck le -> begin
-           Format.eprintf "%a@." print_error le;
+           Format.eprintf "%a@." (print_error opt) le;
            Shrcnt.update tprcs (-1L);
            ignore (Unix.write (snd pipe) "." 0 1 : int);
            exit 1
@@ -334,35 +337,37 @@ let pp_ok fmt (fname,s) =
   | None -> Format.fprintf fmt "%s" s
   | Some x -> Format.fprintf fmt "%s is %s" x s
 
-let pp_fail fmt (fname,s,le) = 
+let pp_fail opt fmt (fname,s,le) = 
   match fname with
-  | None -> Format.fprintf fmt "@[<v>Error not %s:@ %a@]" s print_error le 
-  | Some x -> Format.fprintf fmt "@[<v>Error %s is not %s:@ %a@]" x s print_error le
+  | None -> 
+    Format.fprintf fmt "@[<v>Error not %s:@ %a@]" s (print_error opt) le 
+  | Some x -> 
+    Format.fprintf fmt "@[<v>Error %s is not %s:@ %a@]" x s (print_error opt) le
 
-let check_all_opt ~para = 
-  if para then check_all_para else check_all
+let check_all_opt opt ~para = 
+  if para then check_all_para opt else check_all opt
 
-let check_ni ?(para=false) ?fname params nb_shares ~order all =
+let check_ni opt ?(para=false) ?fname params nb_shares ~order all =
   try 
     let len = List.length all in
     let state = init_state nb_shares params in
     let args = L.cons order all len [] in
-    check_all_opt ~para state (nb_shares - 1) args;
+    check_all_opt opt ~para state (nb_shares - 1) args;
     Format.printf "%a@." pp_ok (fname,"NI at order "^string_of_int order)
   with CanNotCheck le ->
-    Format.eprintf "%a@." pp_fail (fname,"NI",le)
+    Format.eprintf "%a@." (pp_fail opt) (fname,"NI",le)
 
-let check_threshold ?(para=false) ?fname order params all = 
+let check_threshold opt ?(para=false) ?fname order params all = 
   try 
     let state = init_state 1 params in
     let len = List.length all in
     let args = L.cons order all len [] in
-    check_all_opt ~para state 0 args;
+    check_all_opt opt ~para state 0 args;
     Format.printf "%a@." pp_ok (fname,"t-threshold secure")
   with CanNotCheck le ->
-    Format.eprintf "%a@." pp_fail (fname,"t-threshold secure",le)
+    Format.eprintf "%a@." (pp_fail opt) (fname,"t-threshold secure",le)
 
-let check_fni ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ interns outs =
+let check_fni opt ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ interns outs =
   try 
     let len_i = List.length interns in
     let state = init_state nb_shares params in
@@ -374,7 +379,7 @@ let check_fni ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ inte
     if not (0 <= from && to_ <= order) then
       error "check_fni" None "invalid range";
 
-    let check = check_all_opt ~para in
+    let check = check_all_opt opt ~para in
     (* First compute the number of tuples *)
     let total = ref Z.zero in
     let outs = List.map (fun l -> List.length l, l) outs in
@@ -406,10 +411,10 @@ let check_fni ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ inte
         Format.fprintf fmt " for range %i..%i" from to_ in
     Format.printf "%a%a@." pp_ok (fname,s) pp_range ()
   with CanNotCheck le ->
-    Format.eprintf "%a@." pp_fail (fname,s,le)
+    Format.eprintf "%a@." (pp_fail opt) (fname,s,le)
 
-let check_sni ?para ?fname = check_fni ?para "SNI" ?fname (fun ki _ko -> ki)
-let check_fni ?para ?fname = check_fni ?para ?fname "FNI" 
+let check_sni opt ?para ?fname = check_fni opt ?para "SNI" ?fname (fun ki _ko -> ki)
+let check_fni opt ?para ?fname = check_fni opt ?para ?fname "FNI" 
 
 (* 
 let mk_interns outs = 

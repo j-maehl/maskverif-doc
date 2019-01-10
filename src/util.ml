@@ -439,3 +439,10 @@ let verbose i = fverbose i Format.std_formatter
 
 
 
+(* -------------------------------------------------------------- *)
+
+type tool_opt = {
+    pp_error  : bool;
+    checkbool : bool;
+  }
+

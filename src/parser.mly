@@ -7,7 +7,7 @@
 %token PROC END PUBLIC INPUTS OUTPUTS SHARES RANDOMS
 %token <string>SNI NI PROBING PRINT 
 %token <string>READ_FILE READ_ILANG
-%token NOGLITCH PARA ORDER VERBOSE
+%token NOGLITCH PARA ORDER VERBOSE NOBOOL NOPRINT
 %token <string> IDENT
 %token <int> INT
 %token LPAREN
@@ -150,6 +150,8 @@ check_opt:
   | ORDER n=INT {Order n }
   | PARA     { Para }
   | NOGLITCH { NoGlitch }
+  | NOBOOL   { NoBool }
+  | NOPRINT  { NoPrint }
 
 command1:
   | f=func                               { Func f }

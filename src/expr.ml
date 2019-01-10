@@ -217,152 +217,6 @@ let pp_expr fmt e =
 (* ------------------------------------------------------------------------ *)
 (* Boolean checker for independance                                         *)
 
-(*
-let etrue = op (HS.make "1'1") [||]
-let efalse = op (HS.make "1'0") [||]
-
-let is_bool e = 
-  if E.equal e etrue then 1
-  else if E.equal e efalse then 0
-  else -1
-
-let partial_eval_e e1 b e = 
-  let tbl = He.create 107 in
-  let e1b = if b then etrue else efalse in
-  let rec aux e = 
-    try He.find tbl e 
-    with Not_found ->
-      let e' = 
-        match e.e_node with
-        | Etop | Epub _ -> etrue (* FIXME *)
-        | Ernd _ | Eshare _ -> 
-          if E.equal e e1 then e1b 
-          else e 
-        | Eneg e -> 
-          let e = aux e in
-          if E.equal e etrue then efalse
-          else if E.equal e efalse then etrue
-          else neg e 
-        | Eadd (e1,e2) ->
-          let e1 = aux e1 in 
-          let e2 = aux e2 in
-          begin match is_bool e1, is_bool e2 with
-          | 0, 0 -> efalse
-          | 0, 1 -> etrue
-          | 0, _ -> e2
-          | 1, 0 -> etrue
-          | 1, 1 -> efalse
-          | 1, _ -> neg e2
-          | _, 0 -> e1
-          | _, 1 -> neg e1
-          | _, _ -> add e1 e2
-          end
-        | Emul (e1,e2) -> 
-          let e1 = aux e1 in
-          begin match is_bool e1 with
-          | 0 -> efalse 
-          | 1 -> aux e2
-          | _ -> 
-            let e2 = aux e2 in
-            match is_bool e2 with
-            | 0 -> efalse
-            | 1 -> e1
-            | _ -> mul e1 e2 
-          end
-        | Eop (_, o, es) ->
-          if HS.equal o _DFF_PP0_ then        aux es.(1)
-          else if HS.equal o _DFFSR_PPP_ then aux es.(1)
-          (* Warning: we break the invariant here *)
-          else op_nodup o (Array.map aux es) in
-      He.replace tbl e e';
-      e' in
-  aux e
-
-exception CheckBool 
-       
-let free_expr e = 
-  let hp = He.create 10 in
-  let hr = He.create 100 in
-  let rec aux e = 
-    match e.e_node with
-    | Etop | Epub _ -> ()
-    | Ernd _   -> He.replace hr e true
-    | Eshare _ -> He.replace hp e true 
-    | Eneg e   -> aux e
-    | Eadd (e1,e2) | Emul (e1,e2) -> aux e1; aux e2
-    | Eop (_, o, es) ->
-      if HS.equal o _DFF_PP0_ then        aux es.(1)
-      else if HS.equal o _DFFSR_PPP_ then aux es.(1)
-      else Array.iter aux es in
-  aux e;
-  let rs = He.fold (fun e _ els -> e::els) hr [] in
-  let ps = He.fold (fun e _ els -> e::els) hp [] in
-  ps, rs
-
-let rec occur ei e = 
-  E.equal ei e || 
-    match e.e_node with
-    | Etop | Epub _ | Ernd _ | Eshare _ -> false
-    | Eneg e -> occur ei e
-    | Eadd(e1,e2) | Emul(e1,e2) -> occur ei e1 || occur ei e2
-    | Eop(_,_, es) -> Array.exists (occur ei) es  
-
-(*
-let rec check_tuple e = 
-  E.equal e etrue || E.equal e efalse ||
-    match e.e_node with
-    | Eop(_,o,es) -> HS.equal o _TUPLE_ && Array.for_all check_tuple es
-    | _ -> 
-      Format.eprintf "check_tuple : %a@." pp_expr e;
-      false
- *)
-      
-
-let check_bool e = 
-  (* compute the params and the randoms *)
-  let ps, rs = free_expr e in
-  let lps, lrs = List.length ps, List.length rs in
-  Format.eprintf "Start boolean checking ps = %i; rs = %i@." lps lrs;
-  if 13 < lrs then raise CheckBool;
-  let get tbl e = try He.find tbl e with Not_found -> 0 in
-  let check_r e rs = 
-    let rtbl = He.create 100 in
-    let add i res = 
-(*      assert (check_tuple res); *)
-      He.replace rtbl res (get rtbl res + (1 lsl i)) in
-    let rec check_r e i rs = 
-(*      Format.printf "check_r %i@." (List.length rs); *)
-      match rs with
-      | [] -> add i e 
-      | r::rs -> 
-        if occur r e then
-          (check_r (partial_eval_e r true e) i rs;
-           check_r (partial_eval_e r false e) i rs)
-        else check_r e (i+1) rs in
-    check_r e 0 rs;
-    rtbl in
-  let et = 
-    List.fold_left (fun e p -> partial_eval_e p true e) e ps in
-  let ttbl = check_r et rs in
-  let check_tbl rtbl = 
-    let check_tr e n =
-      if n <> get rtbl e then raise CheckBool in
-    He.iter check_tr ttbl;
-    let check_rt e n = 
-      if n <> get ttbl e then raise CheckBool in
-    He.iter check_rt rtbl in
-  let rec check_p e ps = 
-    match ps with
-    | [] -> check_tbl (check_r e rs) 
-    | p::ps -> 
-      if occur p e then
-        (check_p (partial_eval_e p true e) ps;
-         check_p (partial_eval_e p false e) ps)
-      else check_p e ps in
-  check_p e ps
- *)
-
-
 type result = 
   | Rb of bool
   | Rtuple of result array
@@ -415,11 +269,13 @@ exception CheckBool (*of
    expr list * (result,int) Hashtbl.t * (result,int) Hashtbl.t * bool He.t *)
 
 
-let check_bool e = 
+let check_bool (opt:tool_opt) e = 
+  assert (opt.checkbool);
   (* compute the params and the randoms *)
   let hp = He.create 10 in
   let hr = He.create 100 in
-  Format.eprintf "Start boolean checking %a@." pp_expr e; 
+  Format.eprintf "Start boolean checking@.";
+  if opt.pp_error then Format.eprintf "%a@." pp_expr e; 
   let rec aux e = 
     match e.e_node with
     | Etop -> assert false

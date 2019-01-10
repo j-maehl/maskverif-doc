@@ -173,3 +173,11 @@ val fverbose :
 val everbose : int -> ('a, Format.formatter, unit) format -> 'a
 val verbose  : int -> ('a, Format.formatter, unit) format -> 'a
 val set_verbose : int -> unit 
+
+(* -------------------------------------------------------------- *)
+
+type tool_opt = {
+    pp_error  : bool;
+    checkbool : bool;
+  }
+

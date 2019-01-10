@@ -263,6 +263,8 @@ let to_pol_bij tbl bij =
   to_pol_bij
 
 let check_indep k (es:expr list) (other: expr list list) = 
+(*  Format.eprintf "try gauzz on@.@[<v>%a@]@."
+     (pp_list "@ " pp_expr) es; *)
 
   (* form expr to pexpr *)
 
