@@ -363,7 +363,8 @@ exception FoundShare of Pinfo.t
 
 let find_share state k = 
   Hv.iter 
-    (fun _p pinfo -> if k < pinfo.Pinfo.nb_used_shares then raise (FoundShare pinfo))
+    (fun _p pinfo -> 
+      if k < pinfo.Pinfo.nb_used_shares then raise (FoundShare pinfo))
     state.s_params
 
 let continue state k = 
@@ -418,10 +419,13 @@ let simplified_expr ?(notfound=false) state =
 (* ----------------------------------------------------------------------- *)
 
 let rec remove_node_and_all_children state n = 
+(*  Format.eprintf "remove_node %a@." pp_node n; *)
   if not (N.equal n top_node) then begin 
-    Vector.iter (fun c -> remove_node_and_all_children state c) n.children;
-    Vector.clear n.children;
-    remove_node state n
+    while (Vector.size n.children <> 0) do
+      let c = Vector.pop n.children in
+      remove_node_and_all_children state c
+    done;
+    remove_node state n;
   end
     
   
@@ -463,7 +467,7 @@ let remove_used_share_except state excepted =
 let simplify_until_with_clear state excepted k = 
   while continue state k do 
     if not (simplify state) then 
-      remove_used_share_except state excepted 
+      remove_used_share_except state excepted;
   done
 
 (* ----------------------------------------------------------------------- *)
