@@ -112,8 +112,11 @@ let print_error opt fmt lhd =
 let find_bij opt _n state maxparams ldfs =
   let lhd = L.lfirst ldfs in
   clear_state state;
-  L.set_top_exprs state lhd;  
+  L.set_top_exprs state lhd; 
+(*  Format.eprintf "find bij (@[%a@])@."
+    (pp_list ",@ " (fun fmt ei -> pp_expr fmt ei.red_expr)) lhd; *)
   init_todo state;
+(*  Format.eprintf "state before = %a@." pp_state state; *)
   if not (simplify_until state maxparams) then 
     let simple = simplified_expr ~notfound:true state in
     let lhd = 
@@ -147,12 +150,21 @@ let find_bij opt _n state maxparams ldfs =
     List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
   else
     let used_share = used_share state in
+    let bij = get_bij state in
+    clear_state state;
+    L.set_top_exprs state lhd; 
     L.set_top_exprs2 state ldfs;
-    clear_bijection state;    
+(*    Format.eprintf "state = %a@." pp_state state; *)
+    replay_bij state bij;
     init_todo state;
     simplify_until_with_clear state used_share maxparams;
-    let is_in ei = is_top_expr state ei.red_expr in 
-    List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
+    let is_in ei = 
+      let res = is_top_expr state ei.red_expr in 
+(*      if res then Format.eprintf "%a is in@." 
+         pp_expr ei.red_expr ; *)
+      res in
+    List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs
+
  
 let check_all opt state maxparams (ldfs:L.ldfs) = 
   let to_check = L.cnp_ldfs ldfs in

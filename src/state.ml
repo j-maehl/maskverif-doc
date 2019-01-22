@@ -465,9 +465,11 @@ let remove_used_share_except state excepted =
 
 
 let simplify_until_with_clear state excepted k = 
+(*  Format.eprintf "simplify_until %a@." pp_state state; *)
   while continue state k do 
     if not (simplify state) then 
       remove_used_share_except state excepted;
+(*    Format.eprintf "simplify_until %a@." pp_state state; *)
   done
 
 (* ----------------------------------------------------------------------- *)
@@ -477,3 +479,35 @@ let is_top_expr state e =
     try He.find state.s_hash e 
     with Not_found -> assert false in
   Vector.exists (N.equal top_node) n.children
+
+(* ------------------------------------------------------------------------ *)
+
+type bijection =  (expr * expr) Stack.t
+
+let get_bij state = 
+  Stack.map (fun (n1,n2) -> n1.expr_desc, n2.expr_desc) state.s_bij
+
+let get_expr state e = 
+  try He.find state.s_hash e with Not_found -> assert false
+
+let replay_bij1 state (e1, e2) = 
+  let n1 = get_expr state e1 in
+  let n2 = get_expr state e2 in
+  (* remove_node_and_all_children, excepted n2 *)
+  if Vector.size n1.children <> 1 then 
+    begin
+      let cs = Vector.copy n1.children in
+      Vector.iter (fun n -> 
+          if not (N.equal n n2) then
+            begin
+              remove_node_and_all_children state n;
+              remove_child state n1 n
+            end) cs
+    end;
+  (* We check that the bijection can be applied *)
+  assert (N.equal (Vector.top n1.children) n2);
+  apply_bij state n1
+
+let replay_bij state bij = 
+  Stack.iter (replay_bij1 state) bij
+

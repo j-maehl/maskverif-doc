@@ -157,6 +157,12 @@ module Stack = struct
 
   let iter f s = 
     for i = 0 to s.st_top - 1 do f s.st_buff.(i) done
+
+  let map f s = 
+    { st_top = s.st_top;
+      st_buff = Array.init s.st_top (fun i -> f s.st_buff.(i));
+    }
+    
 end 
 
 (* -------------------------------------------------------------------- *)

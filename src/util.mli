@@ -60,6 +60,7 @@ module Stack :
     val copy : 'a t -> 'a t
     val to_list : 'a t -> 'a list
     val iter : ('a -> unit) -> 'a t -> unit
+    val map : ('a -> 'b) -> 'a t -> 'b t
   end
 
 (* ----------------------------------------------------------------------- *)

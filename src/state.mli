@@ -42,6 +42,10 @@ val simplified_expr : ?notfound:bool -> state -> expr -> expr
    k share of each input, return true if it success *)
 val simplify_until : state -> int -> bool 
 
+type bijection
+val get_bij : state -> bijection
+val replay_bij : state -> bijection -> unit
+
 val clear_bijection : state -> unit 
 
 val used_share : state -> node -> bool
