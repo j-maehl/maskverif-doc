@@ -7,6 +7,15 @@ type p_expr =
   | PEadd of p_expr list 
   | PEmul of p_expr list 
 
+let rec pp_p_expr fmt pe = 
+  match pe with
+  | PEvar e  -> 
+    if E.equal e efalse then Format.fprintf fmt "0"
+    else if E.equal e etrue then Format.fprintf fmt "1"
+    else Format.fprintf fmt "@[(%a)@]" pp_expr e 
+  | PEadd ls -> Format.fprintf fmt "@[(%a)@]" (pp_list " +@ " pp_p_expr) ls 
+  | PEmul ls -> Format.fprintf fmt "@[(%a)@]" (pp_list " *@ " pp_p_expr) ls 
+
 let zero = PEvar efalse
 let one  = PEvar etrue
 
@@ -40,6 +49,13 @@ and compare_s ps1 ps2 =
     | 0 -> compare_s ps1 ps2
     | c -> c
 
+module Pcmp = 
+  struct
+    type t = p_expr
+    let compare = compare_p 
+  end
+module Sp = Set.Make(Pcmp)
+
 (* ----------------------------------------------------- *)
 (* Addition                                              *)
 
@@ -71,6 +87,23 @@ let add p1 p2 =
   let ps1 = add_to_list p1 in
   let ps2 = add_to_list p2 in
   mk_add (merge_add ps1 ps2)
+
+(* Simplify p + !p into 1 *)
+let clear_add p = 
+  match p with
+  | PEadd ps ->
+    let nbone = ref 0 in
+    let doit ps p = 
+      let p1 = add p one in
+      if Sp.mem p1 ps then (incr nbone; Sp.remove p1 ps)
+      else Sp.add p ps in
+    let p = mk_add (Sp.elements (List.fold_left doit Sp.empty ps)) in
+    if !nbone mod 2 = 0 then p
+    else add p one
+  | _ -> p
+
+let add p1 p2 = 
+  clear_add (add p1 p2)
 
 (* ----------------------------------------------------- *)
 (* Multiplication                                        *)
@@ -105,6 +138,22 @@ let mul p1 p2 =
     let ps2 = mul_to_list p2 in
     mk_mul (merge_mul ps1 ps2)
 
+(* Simplify p * !p into 0 *)
+let clear_mul p = 
+  match p with
+  | PEmul ps ->
+    let doit ps p = 
+      let p1 = add p one in
+      if Sp.mem p1 ps then raise Not_found 
+      else Sp.add p1 ps in
+    begin try 
+      ignore (List.fold_left doit Sp.empty ps); p
+    with Not_found -> zero
+    end
+  | _ -> p
+
+let mul p1 p2 = 
+  clear_mul (mul p1 p2)
 (* ----------------------------------------------------- *)
 (* Substitution                                          *)
 
@@ -276,6 +325,10 @@ let check_indep k (es:expr list) (other: expr list list) =
       let es = split_tuple [] e in
       List.fold_left (fun s e -> to_pol e :: s) s es in
     List.fold_left to_pols [] es in
+
+  Format.eprintf "ps = @[(%a)@]@."
+    (pp_list ",@ " pp_p_expr) ps;
+    
 
   let bij, param_tbl = initial_check_indep k ps in
 
