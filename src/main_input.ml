@@ -57,6 +57,7 @@ open Checker
 let globals = Hashtbl.create 107
 
 type check_opt = {
+   trans     : bool;
    glitch    : bool;
    para      : bool;
    order     : int option;
@@ -64,19 +65,22 @@ type check_opt = {
   }
 
 let process_check_opt os = 
+  let trans = ref false in
   let glitch = ref true in
   let para = ref false in
   let order = ref None in
   let bool = ref true in
   let print = ref true in
   let doit = function
+    | Transition -> trans := true
     | NoGlitch -> glitch := false 
     | Para -> para := true
     | Order n -> order := Some n
     | NoBool -> bool := false 
     | NoPrint -> print := false in
   List.iter doit os;
-  { glitch = !glitch;
+  { trans  = !trans;
+    glitch = !glitch;
     para   = !para;
     order  = !order;
     option = { pp_error = !print; checkbool = !bool; };
@@ -87,11 +91,16 @@ let mk_order o nb_shares =
   | None -> nb_shares - 1
   | Some i -> i
 
+let pp_option fmt o = 
+  Format.fprintf fmt "(%stransition,%sglitch)"
+  (if o.trans then "" else "no ")
+  (if o.glitch then "" else "no ")
+
 let check_ni f o = 
   let func = Prog.get_global globals f in
-  Format.printf "Checking NI for %s:@." (data f);
+  Format.printf "Checking NI for %s: %a@." (data f) pp_option o;
   let (params, nb_shares, all, _) = 
-    Prog.build_obs_func ~glitch:o.glitch ~ni:`NI (loc f) func in
+    Prog.build_obs_func ~trans:o.trans ~glitch:o.glitch ~ni:`NI (loc f) func in
 (*  Format.printf "@[<v>observations:@ %a@]@." Checker.pp_eis all; *)
   let order = mk_order o nb_shares in
   Checker.check_ni ~para:o.para ~fname:(data f) o.option params ~order nb_shares all
@@ -102,11 +111,11 @@ let check_threshold f o =
     match func.Prog.f_in with
     | (_,xs) :: _ -> List.length xs 
     | _           -> assert false in
-  Format.printf "Checking Threshold for %s:@." (data f);
+  Format.printf "Checking Threshold for %s: %a@." (data f) pp_option o;
   let func = Prog.threshold func in
 (*  Format.printf "%a@." (Prog.pp_func ~full:Prog.var_pinfo) func; *)
   let (params, _, all, _) = 
-    Prog.build_obs_func ~glitch:o.glitch ~ni:`Threshold (loc f) func in
+    Prog.build_obs_func ~trans:o.trans ~glitch:o.glitch ~ni:`Threshold (loc f) func in
   let order = mk_order o nb_shares in
  (* Format.printf "@[<v>observations:@ %a@]@." Checker.pp_eis all; *)
   Checker.check_threshold o.option ~para:o.para order params all
@@ -115,9 +124,9 @@ let check_sni f b o =
   let from, to_ = 
     match b with None -> None, None | Some (i,j) -> Some i, Some j in
   let func = Prog.get_global globals f in
-  Format.printf "Checking SNI for %s:@." (data f);
+  Format.printf "Checking SNI for %s: %a@." (data f) pp_option o;
   let (params, nb_shares, interns, outputs) = 
-    Prog.build_obs_func ~glitch:o.glitch ~ni:`SNI (loc f) func in
+    Prog.build_obs_func ~trans:o.trans ~glitch:o.glitch ~ni:`SNI (loc f) func in
 (*    Format.printf "@[<v>interns:@ %a@]@." Checker.pp_eis interns;
     Format.printf "@[<v>outputs:@ %a@]@." Checker.pp_eis outputs;  *)
   let order = mk_order o nb_shares in

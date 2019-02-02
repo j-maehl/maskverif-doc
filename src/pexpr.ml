@@ -1,6 +1,7 @@
 open Util
 open Expr
 
+let with_clear = ref false 
 
 type p_expr =
   | PEvar of expr  
@@ -103,7 +104,8 @@ let clear_add p =
   | _ -> p
 
 let add p1 p2 = 
-  clear_add (add p1 p2)
+  if !with_clear then clear_add (add p1 p2)
+  else add p1 p2
 
 (* ----------------------------------------------------- *)
 (* Multiplication                                        *)
@@ -153,7 +155,9 @@ let clear_mul p =
   | _ -> p
 
 let mul p1 p2 = 
-  clear_mul (mul p1 p2)
+  if !with_clear then clear_mul (mul p1 p2)
+  else mul p1 p2
+
 (* ----------------------------------------------------- *)
 (* Substitution                                          *)
 
@@ -326,8 +330,8 @@ let check_indep k (es:expr list) (other: expr list list) =
       List.fold_left (fun s e -> to_pol e :: s) s es in
     List.fold_left to_pols [] es in
 
-  Format.eprintf "ps = @[(%a)@]@."
-    (pp_list ",@ " pp_p_expr) ps;
+  (*Format.eprintf "ps = @[(%a)@]@."
+    (pp_list ",@ " pp_p_expr) ps; *)
     
 
   let bij, param_tbl = initial_check_indep k ps in
@@ -378,3 +382,13 @@ let check_indep k (es:expr list) (other: expr list list) =
   List.iter (fun es -> List.iter doit es) other;
 (*  Format.eprintf "nb_other = %i; extra = %i@." !all !extra; *)
   in_tbl
+
+let check_indep k (es:expr list) (other: expr list list) = 
+  with_clear := false;
+  try check_indep k es other
+  with Depend ->
+    with_clear := true;
+    check_indep k es other
+
+    
+  

@@ -573,6 +573,12 @@ end
 
 (* ------------------------------------------------------------------ *)
 (* Buildind the set of possible observations *)
+(* 
+  x = { e } // pas de glitches
+  x := e1 op e2 // genere des glitches 
+  x != e   // stop les glitch 
+  x <- e   
+*)
 
 let rec expr_of_pexpr e = 
   match e with
@@ -619,7 +625,7 @@ let add_observation obs e pp =
     
 let rec add_sub obs e pp = 
   match e with
-  | Evar _ -> assert false
+  | Evar _ -> assert false (* Variables are boxed in Ebox *)
   | Eadd(e1,e2) -> 
     let e1 = add_sub obs e1 pp in
     let e2 = add_sub obs e2 pp in
@@ -646,16 +652,34 @@ let rec add_sub obs e pp =
     add_observation obs e pp;
     e
  
-let glitch_expr e = 
-  let els = Array.of_list (E.Se.elements (fv e)) in
+let add_trans obs etrans e pp = 
+  match etrans with
+  | None -> ()
+  | Some et ->
+    let e = 
+      if E.E.equal et e then e 
+      else E.tuple_nodup [|et; e|] in
+    add_observation obs e pp
+
+let glitch_expr etrans e = 
+  let fv = fv e in
+  let fv = 
+    match etrans with 
+    | None -> fv 
+    | Some e -> E.Se.add e fv in
+  let els = Array.of_list (E.Se.elements fv) in
   if Array.length els = 1 then els.(0)
   else E.tuple_nodup els 
   
-  
-let add_glitch obs e pp =
-  add_observation obs (glitch_expr e) pp
+let add_glitch obs etrans e pp =
+  add_observation obs (glitch_expr etrans e) pp
    
-let rec build_obs ~glitch obs s c = 
+let rec remove_top_not e = 
+  match e.E.e_node with
+  | E.Eneg e -> remove_top_not e
+  | _      -> e
+
+let rec build_obs ~trans ~glitch obs s c = 
   match c with 
   | [] -> ()
   | {instr_d = Imacro _} :: _ -> assert false 
@@ -664,20 +688,27 @@ let rec build_obs ~glitch obs s c =
     let pp fmt () = 
       pp fmt (); 
       Format.fprintf fmt "(* from @[%a@] *)@ " (pp_expr ~full:dft_pinfo) e in
+    let etrans = 
+      if trans then 
+        try Some (remove_top_not (expr_of_pexpr (E.Hv.find s i.i_var)))
+        with Not_found -> None (* The variable has not been assigned before *)
+      else None in
     let e = 
       match i.i_kind with
-      | P.IK_sub ->
+      | P.IK_sub -> 
         let e = add_sub obs e pp in
+        add_trans obs etrans e pp;
         Ebox e
       | P.IK_glitch ->
         if glitch then
           begin
-            add_glitch obs e pp;
+            add_glitch obs etrans e pp;
             let e = expr_of_pexpr e in
             Ebox e
           end
         else
           let e = add_sub obs e pp in
+          add_trans obs etrans e pp;
           Ebox e 
       | P.IK_hide -> 
         let e = expr_of_pexpr e in
@@ -686,15 +717,16 @@ let rec build_obs ~glitch obs s c =
       | P.IK_subst -> 
         if glitch then 
           begin
-            add_glitch obs e pp;
+            add_glitch obs etrans e pp;
             e 
           end 
         else 
           let e = add_sub obs e pp in
+          add_trans obs etrans e pp;
           Ebox e 
     in
     E.Hv.replace s i.i_var e;
-    build_obs ~glitch obs s c 
+    build_obs ~trans ~glitch obs s c 
       
 let sub_array es1 es2 = 
   let n1 = Array.length es1 in
@@ -758,7 +790,7 @@ let remove_subtuple pin obs =
   List.iter doit obs;
   E.Se.elements !robs
 
-let build_obs_func ~ni ~glitch loc f =
+let build_obs_func ~ni ~trans ~glitch loc f =
   let nb_shares = ref 0 in
   let check_shares xs = 
     let xs = Array.of_list xs in
@@ -795,7 +827,7 @@ let build_obs_func ~ni ~glitch loc f =
   add_vars "randoms" E.rnd f.f_rand;
   (* Build the public variables *)
   add_vars "public" E.pub f.f_pin; 
-  build_obs ~glitch obs s f.f_cmd;
+  build_obs ~trans ~glitch obs s f.f_cmd;
 
   (* Add the observation on the output variables *)
   let add_out out = 
@@ -805,7 +837,7 @@ let build_obs_func ~ni ~glitch loc f =
           Format.fprintf fmt "(* output %a *)@ " 
             (pp_var ~full:dft_pinfo) x in
         let e = 
-          if glitch then glitch_expr e 
+          if glitch then glitch_expr None e 
           else expr_of_pexpr e in
         add_observation obs e pp;
         e) out in

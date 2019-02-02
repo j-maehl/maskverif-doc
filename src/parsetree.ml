@@ -75,6 +75,7 @@ type checker_option =
   | Para
   | NoBool
   | NoPrint
+  | Transition
 
 type checker_options = checker_option list
 
