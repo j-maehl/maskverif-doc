@@ -396,14 +396,14 @@ let _TUPLE_     = HS.make ""
 
 let pp_z fmt z = 
   let s = Z.to_string z in
-  let len = Bytes.length s in
+  let len = String.length s in
   let s' = 
     let m = len mod 3 in
     if m = 0 then ""
-    else Bytes.make (3 - m) '0' in
+    else String.make (3 - m) '0' in
 
   let s = s' ^ s in
-  let k = Bytes.length s / 3 in
+  let k = String.length s / 3 in
   for i = 0 to k - 1 do
     for j = 0 to 2 do
       Format.fprintf fmt "%c" s.[i*3 + j]

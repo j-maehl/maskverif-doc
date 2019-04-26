@@ -118,15 +118,15 @@ let find_bij opt _n state maxparams ldfs =
   init_todo state;
 (*  Format.eprintf "state before = %a@." pp_state state; *)
   if not (simplify_until state maxparams) then 
-    let simple = simplified_expr ~notfound:true state in
+  (*  let simple = simplified_expr ~notfound:true state in
     let lhd = 
       List.map (fun ei -> { ei with red_expr = simple ei.red_expr}) lhd in    
-   
+   *)   
     let es = 
       List.map (fun ei -> ei.red_expr) lhd in
     let other = 
       List.map 
-        (fun ldf -> List.map (fun ei -> simple ei.red_expr) ldf.L.l)
+        (fun ldf -> List.map (fun ei -> (* simple *) ei.red_expr) ldf.L.l)
       ldfs
     in
 (*    Format.eprintf "Cannot check using graph, try to use gauzz@."; *)
@@ -135,7 +135,17 @@ let find_bij opt _n state maxparams ldfs =
     let etbl = 
       try Pexpr.check_indep maxparams es other 
       with Pexpr.Depend ->
-        if opt.checkbool && maxparams = 0 then
+        Format.eprintf "start poly@.";
+        let ind = Poly_solve.check_indep maxparams es in
+        Format.eprintf "end poly@.";
+
+        if ind then
+          let etbl = He.create 101 in
+          List.iter (fun e -> He.replace etbl e ()) es;
+          etbl
+        else raise (CanNotCheck lhd) in
+
+(*        if opt.checkbool && maxparams = 0 then
           begin
             Format.eprintf "Cannot check using gauzz, try to compute distr@.";
             try 
@@ -143,10 +153,10 @@ let find_bij opt _n state maxparams ldfs =
               let etbl = He.create 101 in
               List.iter (fun e -> He.replace etbl e ()) es;
               etbl
-            with Expr.CheckBool -> raise (CanNotCheck lhd)
+            with Expr.CheckBool -> raise (CanNotCheck lhd) 
           end
-        else raise (CanNotCheck lhd) in
-    let is_in ei = He.mem etbl (simple ei.red_expr) in 
+        else raise (CanNotCheck lhd) in *)
+    let is_in ei = He.mem etbl ((* simple *) ei.red_expr) in 
     List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
   else
     let used_share = used_share state in
@@ -310,7 +320,7 @@ let check_all_para opt state maxparams (ldfs:L.ldfs) =
        | CanNotCheck le -> begin
            Format.eprintf "%a@." (print_error opt) le;
            Shrcnt.update tprcs (-1L);
-           ignore (Unix.write (snd pipe) "." 0 1 : int);
+           ignore (Unix.write (snd pipe) (Bytes.of_string ".") 0 1 : int);
            exit 1
          end
 

@@ -14,6 +14,7 @@ module type VAR = sig
   type t 
   val equal   : t -> t -> bool
   val compare : t -> t -> int
+  val pp: Format.formatter -> t -> unit 
 end
 
 exception NotDivisible 
@@ -38,10 +39,18 @@ module Poly(V:VAR) = struct
 
     type t = var list 
 
-    let equal m1 m2 = List.equal V.equal m1 m2 
+    let equal m1 m2 = 
+      List.equal V.equal m1 m2 
      
-
-    let compare = lex V.compare 
+    let rec compare m1 m2 = 
+      match m1, m2 with
+      | [], [] -> 0
+      | [], _::_ -> -1
+      | _::_, [] -> 1
+      | x1::m1, x2::m2 ->
+        let cmp = compare m1 m2 in
+        if cmp = 0 then V.compare x1 x2
+        else cmp
  
     let one = [] 
 
@@ -84,6 +93,12 @@ module Poly(V:VAR) = struct
       List.exists (fun x' -> V.compare x x' = 0) m 
 
     let eval rho m = List.for_all rho m
+
+    let pp fmt m = 
+      match m with 
+      | [] -> Format.fprintf fmt "1"
+      | _ -> Format.fprintf fmt "@[%a@]" (pp_list " *@ " V.pp) m
+
   end
 
   type mon = M.t
@@ -91,6 +106,8 @@ module Poly(V:VAR) = struct
   type t = mon list
 
   let equal p1 p2 = List.equal M.equal p1 p2 
+
+  let pp fmt = Format.fprintf fmt "@[%a@]#" (pp_list " +@ " M.pp) 
 
   let zero = []
   let one = [M.one]
@@ -153,6 +170,7 @@ module Poly(V:VAR) = struct
        | [] -> raise DivByZero
        | db :: _ -> db in
      let rec aux q a = 
+  (*     Format.eprintf "q = %a; a = %a; db = %a; b = %a@." pp q pp a M.pp db pp b; *)
        match a with
        | [] -> q, zero
        | da :: _ ->
@@ -169,8 +187,8 @@ module Poly(V:VAR) = struct
      let rec aux = function
        | [] -> ()
        | m::a ->
-         (try q := M.divx m x :: !q
-          with NotDivisible -> r := m :: !r);
+         (try q := add [M.divx m x] !q
+          with NotDivisible -> r := add [m] !r);
          aux a in
      aux a;
      !q, !r
@@ -195,13 +213,15 @@ module Poly(V:VAR) = struct
       r will not occur in p1 p2 p3.
       r should occur in p *)
    let check_rnd_eucl r p = 
-       let p2, pr = divx p r in (* p = p2 * r + pr *)
-       (* div_eucl pr p2 = (p1, p3) ->
-          pr = p1 * p2 + p3  ->
-          p = r * p2 + p1 * p2 + p3 ->
-          p = (r + p1) * p2 + p3 *)
-       let p1,p3 = div_eucl pr p2 in
-       (p1, p2, p3)
+     let p2, pr = divx p r in (* p = p2 * r + pr *)
+(*     Format.eprintf "r = %a; p2 = %a; pr = %a@."
+       V.pp r pp p2 pp pr; *)
+     (* div_eucl pr p2 = (p1, p3) ->
+        pr = p1 * p2 + p3  ->
+        p = r * p2 + p1 * p2 + p3 ->
+        p = (r + p1) * p2 + p3 *)
+     let p1,p3 = div_eucl pr p2 in
+     (p1, p2, p3)
      
    let dependx x p = 
      List.exists (M.dependx x) p
@@ -247,6 +267,7 @@ module Poly(V:VAR) = struct
        | c when c < 0 -> m2 :: diff p1 p2'
        | _ -> m1 :: diff p1' p2 
 
+             
 end
 
 
