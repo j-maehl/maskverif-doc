@@ -1,0 +1,14 @@
+To compile the tool, the best way is to use nix
+
+Start doing
+
+> nix-shell
+> make 
+
+Then you can start using it iteractively by doing 
+./maskverif 
+or by passing a .mv file
+./maskverif < tutorial.mv
+
+A small tutorial is provide in tutorial.mv
+
