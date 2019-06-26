@@ -1,0 +1,3 @@
+read_ilang Sbox_state_annot.ilang
+verbose 1
+order 1 noglitch NI \sbox_state

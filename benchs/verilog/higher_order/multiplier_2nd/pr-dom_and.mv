@@ -1,0 +1,3 @@
+read_ilang dom_and_annot.ilang
+verbose 3
+Probing \dom_and
