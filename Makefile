@@ -1,7 +1,6 @@
 # --------------------------------------------------------------------
 OCB_FLAGS := 
 MAIN      := main
-MAINPARSE := main_input
 ILANG     := ilang
 UNAME_S   := $(shell uname -s)
 
@@ -17,11 +16,11 @@ OCB := ocamlbuild -use-ocamlfind $(OCB_FLAGS)
 all: native 
 
 clean:
-	$(OCB) -clean; rm -f src/*~
+	$(OCB) -clean; rm -f src/*~ maskverif
 
 native: 
-	$(OCB) -tag debug $(MAIN).native $(MAINPARSE).native 
-
+	$(OCB) -tag debug $(MAIN).native 
+	ln -sf $(MAIN).native maskverif
 byte:
 	$(OCB) $(MAIN).byte $(MAINPARSE).byte
 
