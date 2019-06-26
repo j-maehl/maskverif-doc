@@ -16,19 +16,19 @@ OCB := ocamlbuild -use-ocamlfind $(OCB_FLAGS)
 all: native 
 
 clean:
-	$(OCB) -clean; rm -f src/*~ maskverif
+	$(OCB) -clean; rm -f *~ src/*~ maskverif
 
 native: 
 	$(OCB) -tag debug $(MAIN).native 
 	ln -sf $(MAIN).native maskverif
 byte:
-	$(OCB) $(MAIN).byte $(MAINPARSE).byte
+	$(OCB) $(MAIN).byte $(MAIN).byte
 
 profile:
-	$(OCB) -tag profile $(MAIN).native $(MAINPARSE).byte
+	$(OCB) -tag profile $(MAIN).native 
 
 debug:
-	$(OCB) -tag debug $(MAIN).byte $(MAINPARSE).byte
+	$(OCB) -tag debug $(MAIN).byte 
 
 test:	native
 	./$(MAIN).native 
