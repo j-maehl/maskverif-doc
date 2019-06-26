@@ -109,7 +109,7 @@ let print_error opt fmt lhd =
       (pp_list ",@ " (fun fmt ei -> pp_expr fmt ei.red_expr)) lhd;
   Format.fprintf fmt "@]"
 
-let find_bij opt _n state maxparams ldfs =
+let find_bij _opt _n state maxparams ldfs =
   let lhd = L.lfirst ldfs in
   clear_state state;
   L.set_top_exprs state lhd; 
