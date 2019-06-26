@@ -1,0 +1,3 @@
+read_ilang ti_and_annot.ilang
+verbose 1
+order 1 SNI \mul

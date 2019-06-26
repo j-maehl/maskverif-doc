@@ -1,0 +1,3 @@
+read_ilang dom_and_annot.ilang
+verbose 1
+noglitch SNI \dom_and

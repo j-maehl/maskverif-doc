@@ -1,0 +1,3 @@
+read_ilang isw_and_annot.ilang
+verbose 1
+SNI \mul_isw

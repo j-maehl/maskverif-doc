@@ -1,0 +1,43 @@
+proc \dom_and:
+  publics: \RstxBI, \ClkxCI
+  inputs : (\YxDI, [\YxDI.[1], \YxDI.[0]]), (\XxDI, [\XxDI.[1], \XxDI.[0]])
+  outputs: [\QxDO.[1], \QxDO.[0]]
+  randoms: \ZxDI
+  others : \n_13, \n_11, \mux_FFxDP_78_15.g4.inv_sel0,
+           \mux_FFxDP_78_15.g3.inv_sel0, \mux_FFxDP_78_15.g2.inv_sel0,
+           \mux_FFxDP_78_15.g1.inv_sel0, \Xi_mul_Yj_37, \Xi_mul_Yj[3],
+           \Xi_mul_Yj[0], \Xi_mul_Yj, \FFxDP_reg[3].d, \FFxDP_reg[3].clk,
+           \FFxDP_reg[2].qi, \FFxDP_reg[2].q, \FFxDP_reg[2].d,
+           \FFxDP_reg[2].clk, \FFxDP_reg[1].qi, \FFxDP_reg[1].q,
+           \FFxDP_reg[1].d, \FFxDP_reg[1].clk, \FFxDP_reg[0].d,
+           \FFxDP_reg[0].clk, \FFxDP.[3], \FFxDP.[2], \FFxDP.[1], \FFxDP.[0],
+           $techmap\FFxDP_reg[0].$auto$proc_dff.cc:124:gen_dffsr_complex$33;
+  
+   \FFxDP_reg[3].clk := \ClkxCI
+   \FFxDP_reg[2].clk := \ClkxCI
+   \FFxDP_reg[1].clk := \ClkxCI
+   \FFxDP_reg[0].clk := \ClkxCI
+   \mux_FFxDP_78_15.g4.inv_sel0 := \RstxBI
+   \mux_FFxDP_78_15.g3.inv_sel0 := \RstxBI
+   \mux_FFxDP_78_15.g2.inv_sel0 := \RstxBI
+   \mux_FFxDP_78_15.g1.inv_sel0 := \RstxBI
+   $techmap\FFxDP_reg[0].$auto$proc_dff.cc:124:gen_dffsr_complex$33 :=
+    !\RstxBI
+   \Xi_mul_Yj[0] := \XxDI.[0] * \YxDI.[0]
+   \Xi_mul_Yj_37 := \XxDI.[1] * \YxDI.[0]
+   \Xi_mul_Yj := \XxDI.[0] * \YxDI.[1]
+   \Xi_mul_Yj[3] := \XxDI.[1] * \YxDI.[1]
+   \FFxDP_reg[0].d := \Xi_mul_Yj[0]
+   \FFxDP_reg[2].d := \Xi_mul_Yj_37 + \ZxDI
+   \FFxDP_reg[1].d := \Xi_mul_Yj + \ZxDI
+   \FFxDP_reg[3].d := \Xi_mul_Yj[3]
+   \n_13 := \FFxDP_reg[2].d
+   \FFxDP_reg[2].qi = ![\FFxDP_reg[2].d]
+   \n_11 := \FFxDP_reg[1].d
+   \FFxDP_reg[1].qi = ![\FFxDP_reg[1].d]
+   \FFxDP_reg[2].q := \FFxDP_reg[2].qi
+   \FFxDP.[2] := \FFxDP_reg[2].qi
+   \QxDO.[1] := \FFxDP_reg[2].qi + \Xi_mul_Yj[3]
+   \FFxDP_reg[1].q := \FFxDP_reg[1].qi
+   \FFxDP.[1] := \FFxDP_reg[1].qi
+   \QxDO.[0] := \Xi_mul_Yj[0] + \FFxDP_reg[1].qi

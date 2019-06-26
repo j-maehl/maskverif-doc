@@ -1,0 +1,5 @@
+read_ilang dom_and_annot.ilang
+verbose 1
+noglitch Probing \dom_and
+
+

@@ -2,3 +2,4 @@ output/
 _build/
 main.native
 maskverif
+benchs/**/*.log

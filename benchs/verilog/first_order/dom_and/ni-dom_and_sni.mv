@@ -1,0 +1,37 @@
+verbose 1
+
+proc dom_and:
+  public inputs RstxBI, ClkxCI
+  inputs : YxDI = YxDI_1 + YxDI_0, XxDI = XxDI_1 + XxDI_0
+  outputs: QxDO = QxDO_1 + QxDO_0
+  randoms: ZxDI;
+  
+   FFxDP_reg3_clk := ClkxCI                        ;
+   FFxDP_reg2_clk := ClkxCI                        ;
+   FFxDP_reg1_clk := ClkxCI                        ;
+   FFxDP_reg0_clk := ClkxCI                        ;
+   mux_FFxDP_78_15_g4_inv_sel0 := RstxBI           ;
+   mux_FFxDP_78_15_g3_inv_sel0 := RstxBI           ;
+   mux_FFxDP_78_15_g2_inv_sel0 := RstxBI           ;
+   mux_FFxDP_78_15_g1_inv_sel0 := RstxBI           ;
+   Xi_mul_Yj0 := XxDI_0 * YxDI_0                   ;
+   Xi_mul_Yj_37 := XxDI_1 * YxDI_0                 ;
+   Xi_mul_Yj := XxDI_0 * YxDI_1                    ;
+   Xi_mul_Yj3 := XxDI_1 * YxDI_1                   ;
+   FFxDP_reg0_d := Xi_mul_Yj0                      ;
+   FFxDP_reg2_d := Xi_mul_Yj_37 + ZxDI             ;
+   FFxDP_reg1_d := Xi_mul_Yj + ZxDI                ;
+   FFxDP_reg3_d := Xi_mul_Yj3                      ;
+   n_13 := FFxDP_reg2_d                            ;
+   FFxDP_reg2_qi = ![FFxDP_reg2_d]                 ;
+   n_11 := FFxDP_reg1_d                            ;
+   FFxDP_reg1_qi = ![FFxDP_reg1_d]                 ;
+   FFxDP_reg2_q := FFxDP_reg2_qi                   ;
+   FFxDP_2 := FFxDP_reg2_qi                        ;
+   QxDO_1 = ![FFxDP_reg2_qi + Xi_mul_Yj3]          ;
+   FFxDP_reg1_q := FFxDP_reg1_qi                   ;
+   FFxDP_1 := FFxDP_reg1_qi                        ;
+   QxDO_0 = ![Xi_mul_Yj0 + FFxDP_reg1_qi]          ;
+end
+
+NI dom_and

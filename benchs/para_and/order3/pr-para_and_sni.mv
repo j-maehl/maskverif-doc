@@ -1,0 +1,29 @@
+(* 
+   a0b0 a0b3 a3b0 a0b2
+   a1b1 a1b0 a0b1 a1b3
+   a2b2 a2b1 a1b2 a2b0
+   a3b3 a3b2 a3b3 a3b1 *)
+
+proc AND:
+  inputs: a[0:3], b[0:3]
+  outputs: c[0:3]
+  shares: ab[0:3], ba[0:3], sa[0:3], sb[0:3], sr[0:3]
+  randoms: r[0:3],r';
+
+  ab := a * b;
+  c   = ![ab + r]; 
+  sa := a >> 1;
+  sb := b >> 1;
+  ab := sa * b;
+  c   = ![c + ab];
+  ba := a * sb;
+  c   = ![c + ba];
+  sr := r >> 1;
+  c   = ![c + sr];
+  sb := b >> 2;
+  ab := a * sb;
+  c   = ![c + ab];
+  c   = ![c + [r',r',r',r']];
+end 
+verbose 1
+Probing AND

@@ -1,0 +1,86 @@
+proc dom_and:
+  public inputs RstxBI, ClkxCI
+  inputs : YxDI = YxDI_2 + YxDI_1 + YxDI_0,
+           XxD1 = XxDI_2 + XxDI_1 + XxDI_0
+  outputs: QxDO = QxDO_2 + QxDO_1 + QxDO_0
+  randoms: ZxDI_2, ZxDI_1, ZxDI_0;
+  
+   FFxDP_reg8_clk := ClkxCI                                               ;
+   FFxDP_reg7_clk := ClkxCI                                               ;
+   FFxDP_reg6_clk := ClkxCI                                               ;
+   FFxDP_reg5_clk := ClkxCI                                               ;
+   FFxDP_reg4_clk := ClkxCI                                               ;
+   FFxDP_reg3_clk := ClkxCI                                               ;
+   FFxDP_reg2_clk := ClkxCI                                               ;
+   FFxDP_reg1_clk := ClkxCI                                               ;
+   FFxDP_reg0_clk := ClkxCI                                               ;
+   mux_FFxDP_77_15_g9_inv_sel0 := RstxBI                                  ;
+   mux_FFxDP_77_15_g8_inv_sel0 := RstxBI                                  ;
+   mux_FFxDP_77_15_g7_inv_sel0 := RstxBI                                  ;
+   mux_FFxDP_77_15_g6_inv_sel0 := RstxBI                                  ;
+   mux_FFxDP_77_15_g5_inv_sel0 := RstxBI                                  ;
+   mux_FFxDP_77_15_g4_inv_sel0 := RstxBI                                  ;
+   mux_FFxDP_77_15_g3_inv_sel0 := RstxBI                                  ;
+   mux_FFxDP_77_15_g2_inv_sel0 := RstxBI                                  ;
+   mux_FFxDP_77_15_g1_inv_sel0 := RstxBI                                  ;
+   Xi_mul_Yj_77 := XxDI_1 * YxDI_0                                        ;
+   Xi_mul_Yj_82 := XxDI_2 * YxDI_0                                        ;
+   FFxDP_reg0_d := XxDI_0 * YxDI_0                                        ;
+   Xi_mul_Yj := XxDI_0 * YxDI_1                                           ;
+   FFxDP_reg4_d := XxDI_1 * YxDI_1                                        ;
+   Xi_mul_Yj_83 := XxDI_2 * YxDI_1                                        ;
+   Xi_mul_Yj_74 := XxDI_0 * YxDI_2                                        ;
+   Xi_mul_Yj_79 := XxDI_1 * YxDI_2                                        ;
+   FFxDP_reg8_d := XxDI_2 * YxDI_2                                        ;
+   FFxDP_reg3_d := Xi_mul_Yj_77 + ZxDI_0                                  ;
+   FFxDP_reg6_d := Xi_mul_Yj_82 + ZxDI_1                                  ;
+   Xi_mul_Yj0 := FFxDP_reg0_d                                             ;
+   FFxDP_reg0_qi = ![FFxDP_reg0_d]                                        ;
+   FFxDP_reg1_d := Xi_mul_Yj + ZxDI_0                                     ;
+   Xi_mul_Yj4 := FFxDP_reg4_d                                             ;
+   FFxDP_reg4_qi = ![FFxDP_reg4_d]                                        ;
+   FFxDP_reg7_d := Xi_mul_Yj_83 + ZxDI_2                                  ;
+   FFxDP_reg2_d := Xi_mul_Yj_74 + ZxDI_1                                  ;
+   FFxDP_reg5_d := Xi_mul_Yj_79 + ZxDI_2                                  ;
+   Xi_mul_Yj8 := FFxDP_reg8_d                                             ;
+   FFxDP_reg8_qi = ![FFxDP_reg8_d]                                        ;
+   n_21 := FFxDP_reg3_d                                                   ;
+   FFxDP_reg3_qi = ![FFxDP_reg3_d]                                        ;
+   n_26 := FFxDP_reg6_d                                                   ;
+   FFxDP_reg6_qi = ![FFxDP_reg6_d]                                        ;
+   FFxDP_reg0_q := FFxDP_reg0_qi                                          ;
+   FFxDP_0 := FFxDP_reg0_qi                                               ;
+   n_17 := FFxDP_reg1_d                                                   ;
+   FFxDP_reg1_qi = ![FFxDP_reg1_d]                                        ;
+   FFxDP_reg4_q := FFxDP_reg4_qi                                          ;
+   FFxDP_4 := FFxDP_reg4_qi                                               ;
+   n_28 := FFxDP_reg7_d                                                   ;
+   FFxDP_reg7_qi = ![FFxDP_reg7_d]                                        ;
+   n_19 := FFxDP_reg2_d                                                   ;
+   FFxDP_reg2_qi = ![FFxDP_reg2_d]                                        ;
+   n_24 := FFxDP_reg5_d                                                   ;
+   FFxDP_reg5_qi = ![FFxDP_reg5_d]                                        ;
+   FFxDP_reg8_q := FFxDP_reg8_qi                                          ;
+   FFxDP_8 := FFxDP_reg8_qi                                               ;
+   FFxDP_reg3_q := FFxDP_reg3_qi                                          ;
+   FFxDP_3 := FFxDP_reg3_qi                                               ;
+   pipelined_g_result0_81 := FFxDP_reg3_qi + FFxDP_reg4_qi                ;
+   FFxDP_reg6_q := FFxDP_reg6_qi                                          ;
+   FFxDP_6 := FFxDP_reg6_qi                                               ;
+   FFxDP_reg1_q := FFxDP_reg1_qi                                          ;
+   FFxDP_1 := FFxDP_reg1_qi                                               ;
+   pipelined_g_result0_76 := FFxDP_reg0_qi + FFxDP_reg1_qi                ;
+   FFxDP_reg7_q := FFxDP_reg7_qi                                          ;
+   FFxDP_7 := FFxDP_reg7_qi                                               ;
+   pipelined_g_result0_85 := FFxDP_reg6_qi + FFxDP_reg7_qi                ;
+   FFxDP_reg2_q := FFxDP_reg2_qi                                          ;
+   FFxDP_2 := FFxDP_reg2_qi                                               ;
+   FFxDP_reg5_q := FFxDP_reg5_qi                                          ;
+   FFxDP_5 := FFxDP_reg5_qi                                               ;
+   QxDO_1 = ![pipelined_g_result0_81 + FFxDP_reg5_qi]                     ;
+   QxDO_0 = ![pipelined_g_result0_76 + FFxDP_reg2_qi]                     ;
+   QxDO_2 = ![pipelined_g_result0_85 + FFxDP_reg8_qi]                     ;
+end 
+
+verbose 1
+noglitch NI dom_and

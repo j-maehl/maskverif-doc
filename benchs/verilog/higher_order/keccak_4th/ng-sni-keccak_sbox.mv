@@ -1,0 +1,3 @@
+read_ilang keccak_sbox_annot.ilang
+verbose 1
+nobool noglitch SNI \keccak_sbox
