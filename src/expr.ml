@@ -28,16 +28,6 @@ module V = struct
 
   let id = ref 0
 
- (* let tbl = Hashtbl.create 100
-
-  let mk_var s =
-    try Hashtbl.find tbl s
-    with Not_found ->
-      let p = { v_id = !id; v_name = s } in
-      incr id;
-      Hashtbl.add tbl s p;
-      p *)
-
   let mk_var s ty =
     let p = { v_id = !id; v_name = s; v_ty = ty } in
     incr id;
@@ -402,5 +392,3 @@ let type_of_expr e =
     match op.op_ty with
     | Some(_,codom) -> Some(codom)
     | None -> None
-
-  

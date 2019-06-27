@@ -109,28 +109,19 @@ let print_error opt fmt lhd =
       (pp_list ",@ " (fun fmt ei -> pp_expr fmt ei.red_expr)) lhd;
   Format.fprintf fmt "@]"
 
-let find_bij _opt _n state maxparams ldfs =
+let find_bij opt _n state maxparams ldfs =
   let lhd = L.lfirst ldfs in
   clear_state state;
-  L.set_top_exprs state lhd;
-(*  Format.eprintf "find bij (@[%a@])@."
-    (pp_list ",@ " (fun fmt ei -> pp_expr fmt ei.red_expr)) lhd; *)
+  L.set_top_exprs state lhd; 
   init_todo state;
-(*  Format.eprintf "state before = %a@." pp_state state; *)
-  if not (simplify_until state maxparams) then
-  (*  let simple = simplified_expr ~notfound:true state in
-    let lhd =
-      List.map (fun ei -> { ei with red_expr = simple ei.red_expr}) lhd in
-   *)
-    let es =
-      List.map (fun ei -> ei.red_expr) lhd in
-    let other =
-      List.map
-        (fun ldf -> List.map (fun ei -> (* simple *) ei.red_expr) ldf.L.l)
+  if not (simplify_until state maxparams) then 
+    let es = List.map (fun ei -> ei.red_expr) lhd in
+    let other = 
+      List.map 
+        (fun ldf -> List.map (fun ei -> ei.red_expr) ldf.L.l)
       ldfs
     in
-(*    Format.eprintf "Cannot check using graph, try to use gauzz@."; *)
-    Format.eprintf "."; Format.pp_print_flush Format.err_formatter ();
+    Format.eprintf "."; Format.pp_print_flush Format.err_formatter (); 
 
     let etbl =
       try Pexpr.check_indep maxparams es other
@@ -143,24 +134,32 @@ let find_bij _opt _n state maxparams ldfs =
           let etbl = He.create 101 in
           List.iter (fun e -> He.replace etbl e ()) es;
           etbl
-        else raise (CanNotCheck lhd) in
+        else 
+          if opt.checkbool && maxparams = 0 then
+            begin
+              Format.eprintf "Cannot check using gauzz, try to compute distr@.";
+              try 
+                Expr.check_bool opt (tuple (Array.of_list es));
+                let etbl = He.create 101 in
+                List.iter (fun e -> He.replace etbl e ()) es;
+                etbl
+              with Expr.CheckBool -> raise (CanNotCheck lhd) 
+            end
+          else raise (CanNotCheck lhd) in 
+    let is_in ei = He.mem etbl (ei.red_expr) in 
+    List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
 
-    let is_in ei = He.mem etbl ((* simple *) ei.red_expr) in
-    List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs
   else
     let used_share = used_share state in
     let bij = get_bij state in
     clear_state state;
     L.set_top_exprs state lhd;
     L.set_top_exprs2 state ldfs;
-(*    Format.eprintf "state = %a@." pp_state state; *)
     replay_bij state bij;
     init_todo state;
     simplify_until_with_clear state used_share maxparams;
-    let is_in ei =
-      let res = is_top_expr state ei.red_expr in
-(*      if res then Format.eprintf "%a is in@."
-         pp_expr ei.red_expr ; *)
+    let is_in ei = 
+      let res = is_top_expr state ei.red_expr in 
       res in
     List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs
 
@@ -426,62 +425,3 @@ let check_fni opt ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ 
 
 let check_sni opt ?para ?fname = check_fni opt ?para "SNI" ?fname (fun ki _ko -> ki)
 let check_fni opt ?para ?fname = check_fni opt ?para ?fname "FNI"
-
-(*
-let mk_interns outs =
-  let souts = Se.of_list outs in
-  let rec aux interns e =
-    if not (Se.mem e interns) then
-      let interns =
-        if not (Se.mem e souts) then Se.add e interns else interns in
-      match e.e_node with
-      | Eadd(e1,e2) | Emul(e1,e2) -> aux (aux interns e1) e2
-      | Eop(_,_, es) -> Array.fold_left aux interns es
-      | _ -> interns
-    else interns in
-  let interns = List.fold_left aux Se.empty outs in
-  let res = List.rev (Se.elements interns) in
-  List.iter (Format.eprintf "%a@." pp_expr) res;
-  res
-
-let main_sni params nb_shares outs =
-  check_sni ~para:false params nb_shares (mk_interns outs) outs
-
-let main_fni f params nb_shares outs =
-  check_fni f params nb_shares (mk_interns outs) outs
- *)
-(* ------------------------------------------------------------------ *)
-
-(*
-let rec remove_box e =
-  match e.e_node with
-  | Eadd(e1,e2) -> add (remove_box e1) (remove_box e2)
-  | Emul(e1,e2) -> mul (remove_box e1) (remove_box e2)
-  | Ebox e      -> remove_box e
-  | _           -> e
-
-let mk_observation es =
-  let rec aux s e =
-     if Se.mem e s then s
-     else
-       let s = Se.add e s in
-       match e.e_node with
-       | Eadd(e1,e2) | Emul(e1,e2) -> aux (aux s e1) e2
-       | _ -> s in
-  let all = Array.fold_left aux Se.empty es in
-  let s = Se.fold (fun e s -> Se.add (remove_box e) s) all Se.empty in
-  Se.elements s
-
-let main_threshold order params es =
-  try
-    let state = init_state 1 params in
-    let all = mk_observation es in
-    let all = List.map (fun e -> e, e) all in
-    let len = List.length all in
-    let args = L.cons order all len [] in
-    check_all state 0 args;
-    Format.printf "t-threshold secure@."
-  with CanNotCheck le ->
-    Format.eprintf "%a@." print_error le
-*)
-(* ------------------------------------------------------------------ *)

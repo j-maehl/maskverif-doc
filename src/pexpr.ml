@@ -371,10 +371,7 @@ let to_pol_bij tbl bij ty =
       p in
   to_pol_bij
 
-let check_indep k (es:expr list) (other: expr list list) =
-(*  Format.eprintf "try gauzz on@.@[<v>%a@]@."
-     (pp_list "@ " pp_expr) es; *)
-
+let check_indep k (es:expr list) (other: expr list list) = 
   let ty = 
     match es with
     | [] -> assert false
@@ -391,10 +388,6 @@ let check_indep k (es:expr list) (other: expr list list) =
       let es = split_tuple [] e in
       List.fold_left (fun s e -> to_pol e :: s) s es in
     List.fold_left to_pols [] es in
-
-  (*Format.eprintf "ps = @[(%a)@]@."
-    (pp_list ",@ " pp_p_expr) ps; *)
-
 
   let bij, param_tbl = initial_check_indep k ps in
 
@@ -432,18 +425,13 @@ let check_indep k (es:expr list) (other: expr list list) =
       He.replace ok_tbl e b;
       b in
 
-(*  let all = ref 0 in
-  let extra = ref 0 in *)
-
-  let doit e =
+  let doit e = 
     if not (He.mem in_tbl e) then
       let es = split_tuple [] e in
-(*      incr all; *)
-      if List.for_all check_bij es then
-        ((*incr extra; *) He.replace in_tbl e ()) in
+      if List.for_all check_bij es then 
+         He.replace in_tbl e () in
 
   List.iter (fun es -> List.iter doit es) other;
-(*  Format.eprintf "nb_other = %i; extra = %i@." !all !extra; *)
   in_tbl
 
 let check_indep k (es:expr list) (other: expr list list) =
