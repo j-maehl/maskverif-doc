@@ -9,16 +9,6 @@ module V = struct
 
   let id = ref 0 
 
- (* let tbl = Hashtbl.create 100 
-
-  let mk_var s =
-    try Hashtbl.find tbl s 
-    with Not_found ->
-      let p = { v_id = !id; v_name = s } in
-      incr id;
-      Hashtbl.add tbl s p;
-      p *)
-
   let mk_var s =
     let p = { v_id = !id; v_name = s } in
     incr id;
@@ -265,9 +255,7 @@ let eval_bool env e =
   eval_bool e
 
 
-exception CheckBool (*of 
-   expr list * (result,int) Hashtbl.t * (result,int) Hashtbl.t * bool He.t *)
-
+exception CheckBool 
 
 let check_bool (opt:tool_opt) e = 
   assert (opt.checkbool);
@@ -298,17 +286,7 @@ let check_bool (opt:tool_opt) e =
   Format.eprintf "Start boolean checking ps = %i; rs = %i@." lps lrs;
   let env = hr in
   List.iter (fun e -> He.replace env e true) ps;
- (* let rec pp_result fmt = function
-    | Rb b -> Format.fprintf fmt "%i" (if b then 1 else 0)
-    | Rtuple rs -> 
-      Format.fprintf fmt "@[(%a)@]" 
-        (pp_list ",@ " pp_result) (Array.to_list rs) in
-  let pp_distr1 fmt r n =
-    Format.fprintf fmt "%a -> %i@ " pp_result r n in
-  let pp_distr fmt tbl = 
-    Format.fprintf fmt "@[<v>distr:@ ";
-    Hashtbl.iter (pp_distr1 fmt) tbl;
-    Format.fprintf fmt "@]"in *)
+
   let check_r rs = 
     Format.eprintf "."; Format.pp_print_flush Format.err_formatter ();
     let rtbl = Hashtbl.create 100 in
@@ -320,17 +298,17 @@ let check_bool (opt:tool_opt) e =
         He.replace hr r true; check_r rs;
         He.replace hr r false; check_r rs in
     check_r rs;
-(*    Format.eprintf "%a@." pp_distr rtbl; *)
+
     rtbl in
   let ttbl = check_r rs in
   let check_tbl rtbl = 
     let check_tr e n =
       if n <> get rtbl e then 
-        raise CheckBool (* (ps,ttbl,rtbl, env) *) in
+        raise CheckBool in
     Hashtbl.iter check_tr ttbl;
     let check_rt e n = 
       if n <> get ttbl e then 
-        raise CheckBool (* (ps,ttbl,rtbl, env) *) in
+        raise CheckBool in
     Hashtbl.iter check_rt rtbl in
   let rec check_p ps = 
     match ps with

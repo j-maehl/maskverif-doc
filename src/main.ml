@@ -127,15 +127,11 @@ let check_sni f b o =
   Format.printf "Checking SNI for %s: %a@." (data f) pp_option o;
   let (params, nb_shares, interns, outputs) = 
     Prog.build_obs_func ~trans:o.trans ~glitch:o.glitch ~ni:`SNI (loc f) func in
-(*    Format.printf "@[<v>interns:@ %a@]@." Checker.pp_eis interns;
-    Format.printf "@[<v>outputs:@ %a@]@." Checker.pp_eis outputs;  *)
   let order = mk_order o nb_shares in
   Checker.check_sni o.option ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares ~order interns outputs 
   
 let pp_added func = 
   Format.printf "proc %s added@." func.Prog.f_name.Expr.v_name
-(*  Format.printf "%a@." (Prog.pp_func ~full:Prog.dft_pinfo) func *)
-
 
 let rec process_command c = 
   match c with
