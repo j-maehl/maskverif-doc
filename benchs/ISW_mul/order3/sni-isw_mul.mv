@@ -1,0 +1,56 @@
+proc AND:
+  inputs: a[0:3], b[0:3]
+  outputs: c[0:3]
+  randoms: r[0:5];
+  
+  c[0] := a[0] * b[0];
+  c[1] := a[1] * b[1];
+  c[2] := a[2] * b[2];
+  c[3] := a[3] * b[3];
+  
+  c[0] = ![c[0] + r[0]];
+  aibj := a[0] * b[1];
+  ajbi := a[1] * b[0];
+  tmp0 = ![aibj + r[0]];
+  tmp1 = ![tmp0 + ajbi];
+  c[1] = ![c[1] + tmp1];
+  
+  c[0] = ![c[0] + r[1]];
+  aibj := a[0] * b[2];
+  ajbi := a[2] * b[0];
+  tmp0 = ![aibj + r[1]];
+  tmp1 = ![tmp0 + ajbi];
+  c[2] = ![c[2] + tmp1];
+  
+  c[0] = ![c[0] + r[2]];
+  aibj := a[0] * b[3];
+  ajbi := a[3] * b[0];
+  tmp0 = ![aibj + r[2]];
+  tmp1 = ![tmp0 + ajbi];
+  c[3] = ![c[3] + tmp1];
+  
+  c[1] = ![c[1] + r[3]];
+  aibj := a[1] * b[2];
+  ajbi := a[2] * b[1];
+  tmp0 = ![aibj + r[3]];
+  tmp1 = ![tmp0 + ajbi];
+  c[2] = ![c[2] + tmp1];
+  
+  c[1] = ![c[1] + r[4]];
+  aibj := a[1] * b[3];
+  ajbi := a[3] * b[1];
+  tmp0 = ![aibj + r[4]];
+  tmp1 = ![tmp0 + ajbi];
+  c[3] = ![c[3] + tmp1];
+  
+  c[2] = ![c[2] + r[5]];
+  aibj := a[2] * b[3];
+  ajbi := a[3] * b[2];
+  tmp0 = ![aibj + r[5]];
+  tmp1 = ![tmp0 + ajbi];
+  c[3] = ![c[3] + tmp1];
+  
+  end
+
+verbose 1
+SNI AND
