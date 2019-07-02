@@ -1,0 +1,14 @@
+proc REFRESH:
+  inputs: a[0:5]
+  outputs : c[0:5]
+  shares  : t[0:5]
+  randoms : r[0:5], r'[0:5];
+
+  c = r + (r >> 1);
+  t = r' + (r' >> 2);
+  c = c + t;
+  c = c + a;
+end
+
+verbose 1
+noglitch SNI REFRESH

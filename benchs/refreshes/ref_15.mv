@@ -1,0 +1,13 @@
+ proc Refresh:
+ inputs: a[0:14]
+ outputs: c[0:14]
+ shares: R[0:14], S[0:14]
+ randoms: r[0:14], s[0:14];
+
+ R =![r + (r>>1)];
+ S =![s + (s>>3)];
+ c =![R+S];
+ c =![a+c];
+end
+
+para SNI Refresh
