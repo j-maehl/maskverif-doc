@@ -1,0 +1,10 @@
+proc REFRESH:
+  inputs: a[0:3]
+  outputs : c[0:3]
+  randoms : r[0:3];
+
+  c = r + (r >> 1);
+  c = c + a;
+end
+
+noglitch SNI REFRESH

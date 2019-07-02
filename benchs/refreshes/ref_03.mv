@@ -1,0 +1,12 @@
+ proc Refresh:
+ inputs: a[0:2]
+ outputs: c[0:2]
+ randoms: t0, t1;
+
+ c[0] =![a[0]+t0];
+ c[1] =![a[1]+t1];
+ t2 =![t0+t1];
+ c[2] =![a[2]+t2];
+end
+
+para SNI Refresh

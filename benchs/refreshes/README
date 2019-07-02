@@ -1,0 +1,5 @@
+Those refresh algorithm are the most efficiant one that we known.
+The number of randomness is low and and for hardware implementation (with glitches) the lattency is only 2 cycles.
+Most of then has been found by Gaëtan Cassiers.
+
+
