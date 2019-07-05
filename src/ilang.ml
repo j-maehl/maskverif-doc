@@ -53,6 +53,7 @@ type operator =
   | Oand
   | Onot
   | Oxor
+  | Oor 
   | Oother of Expr.operator 
   | Off of Expr.operator
   | Oid
@@ -145,9 +146,7 @@ module Process = struct
       "$_NOT_", { o_input = ["\\A";]; o_output = "\\Y"; o_desc = Onot };
       "$_XOR_", { o_input = ["\\A";"\\B"]; o_output = "\\Y"; o_desc = Oxor };
       "$_AND_", { o_input = ["\\A";"\\B"]; o_output = "\\Y"; o_desc = Oand };
-      "$_OR_" , { o_input = ["\\A";"\\B"]; o_output = "\\Y";
-                  o_desc = 
-                    Oother (Op.make "$_OR_" (Some([w1;w1],w1)) false Other) };
+      "$_OR_" , { o_input = ["\\A";"\\B"]; o_output = "\\Y"; o_desc = Oor };
       "$_MUX_", { o_input = ["\\A";"\\B";"\\S"]; o_output = "\\Y";
                   o_desc = 
                     Oother (Op.make "$_MUX_" 
@@ -626,6 +625,8 @@ module ToProg = struct
     | Oxor, _        -> assert false
     | Onot, [e1]     -> ksubst , P.Eop1(o_negb, e1)
     | Onot, _        -> assert false
+    | Oor, [e1; e2]  -> ksubst, P.Enot (P.Emul(P.Enot e1, P.Enot e2))
+    | Oor, _         -> assert false
     | Off _s,  es    -> kglitch, List.nth es 1 (* P.Eop(s, es) *)
     | Oid , [e]      -> ksubst , e
     | Oid , _        -> assert false
