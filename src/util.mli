@@ -57,6 +57,27 @@ module Stack :
     val iter : ('a -> unit) -> 'a t -> unit
     val map : ('a -> 'b) -> 'a t -> 'b t
   end
+(* ----------------------------------------------------------------------- *)
+module SmallSet :
+  sig 
+    type t
+    val is_empty : t -> bool
+    val mem : int -> t -> bool
+
+    val empty : t
+    val singleton : int -> t 
+    val add   : t -> int -> t
+    val remove : t -> int -> t
+
+    val inter : t -> t -> t
+    val union : t -> t -> t 
+    val diff  : t -> t -> t
+
+    val card : t -> int 
+
+    val iter : (int -> unit) -> t -> unit
+    val fold : (int -> 'a -> 'a) -> 'a -> t -> 'a
+end
 
 (* ----------------------------------------------------------------------- *)
 val finally : (unit -> 'a) -> ('b -> 'c) -> 'b -> 'c
@@ -176,4 +197,5 @@ type tool_opt = {
     pp_error  : bool;
     checkbool : bool;
   }
+
 

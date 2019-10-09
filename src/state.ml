@@ -103,28 +103,38 @@ module Pinfo = struct
 
   type t = {
     mutable nb_used_shares : int; 
-            p_shares       : node Stack.t;
+(*            p_shares       : node Stack.t; *)
+    mutable used_shares    : SmallSet.t;
   }
 
-  let init nb_params = {
-    nb_used_shares = 0;
-    p_shares = Stack.make nb_params top_node;
-  }
+  let init nb_params = 
+    assert (0 <= nb_params && nb_params < 63);
+    {
+      nb_used_shares = 0;
+  (*    p_shares = Stack.make nb_params top_node; *)
+      used_shares = SmallSet.empty;
+    }
 
-  let declare info share =
-    Stack.push info.p_shares share
+(*  let declare info share =
+    Stack.push info.p_shares share  *)
 
-  let incr info = 
-    info.nb_used_shares <- info.nb_used_shares + 1
+  let add_share i info = 
+    assert (not (SmallSet.mem i info.used_shares));
+    info.nb_used_shares <- info.nb_used_shares + 1;
+    info.used_shares <- SmallSet.add info.used_shares i
 
-  let decr info = 
-    info.nb_used_shares <- info.nb_used_shares - 1
+  let remove_share i info = 
+    if (SmallSet.mem i info.used_shares) then begin
+        info.nb_used_shares <- info.nb_used_shares - 1;
+        info.used_shares <- SmallSet.remove info.used_shares i
+      end
 
-  let iter f info = Stack.iter f info.p_shares
+  let iter f info = SmallSet.iter f info.used_shares
 
   let clear info = 
     info.nb_used_shares <- 0;
-    Stack.clear info.p_shares
+ (*   Stack.clear info.p_shares; *)
+    info.used_shares <- SmallSet.empty
 
 end
 
@@ -135,6 +145,7 @@ type state = {
     s_count    : Count.t;
     s_hash     : node He.t;
     s_params   : Pinfo.t Hv.t;
+    s_shares   : node array Hv.t;
     s_randoms  : node Stack.t;  (* random nodes *)
     s_todo     : node Stack.t;  (* next random to eliminate *)
     s_top      : node Vector.t; (* parents of top *)
@@ -147,10 +158,14 @@ let init_state nb_shares params =
   let s_count = Count.init () in
 
   (* Create the node corresponding to each share *)
-  let s_params = Hv.create (2 * List.length params) in
+  let nb_params =  List.length params in
+  let s_shares = Hv.create (2 * nb_params) in
+  let s_params = Hv.create (2 * nb_params) in
   List.iter (fun p -> 
     let p_info = Pinfo.init nb_shares in
-    Hv.add s_params p p_info) params;
+    let a = Array.make nb_shares top_node in
+    Hv.add s_params p p_info;
+    Hv.add s_shares p a) params;
 
   (* Add top to the hash table *)
   let s_hash = He.create 1000 in
@@ -161,6 +176,7 @@ let init_state nb_shares params =
     s_count;
     s_hash;
     s_params;
+    s_shares;
     s_randoms = Stack.make 1000 top_node;
     s_todo = Stack.make 1000 top_node;
     s_top  = Vector.create 1000 top_node;
@@ -208,22 +224,25 @@ let pp_state fmt state =
   
 (* ----------------------------------------------------------------------- *)  
 
-let add_used_share state p = 
-  Pinfo.incr (Hv.find state.s_params p) 
+let add_used_share state p i = 
+  Format.printf "add share %a %i@." Expr.pp_var p i;
+  Pinfo.add_share i (Hv.find state.s_params p) 
 
-let rm_used_share state p = 
-  Pinfo.decr (Hv.find state.s_params p)
+let rm_used_share state p i = 
+  Format.printf "remove share %a %i@." Expr.pp_var p i;
+  Pinfo.remove_share i (Hv.find state.s_params p) 
 
-let declare_share state p n = 
-  Pinfo.declare (Hv.find state.s_params p) n
+let declare_share state p i n = 
+  let a = Hv.find state.s_shares p in
+  a.(i) <- n
 
 let declare_random state n = 
   Stack.push state.s_randoms n
 
 let add_children state p c = 
   begin match p.descriptor with
-  | Share(x,_,_) when Vector.size p.children = 0 ->
-    add_used_share state x
+  | Share(x,i,_) when Vector.size p.children = 0 ->
+    add_used_share state x i
   | _ -> ()
   end;
   Vector.push p.children c
@@ -285,7 +304,7 @@ let rec add_expr state e =
     He.add state.s_hash e n;
     begin match descriptor with
     | Rnd _        -> declare_random state n
-    | Share(p,_,_) -> declare_share state p n
+    | Share(p,i,_) -> declare_share state p i n
     | _            -> ()
     end;
     n
@@ -311,7 +330,7 @@ and remove_node state n =
   match n.descriptor with
   | Top   -> assert false 
   | Rnd _ -> ()
-  | Share(a,_,_) -> rm_used_share state a 
+  | Share(a,i,_) -> rm_used_share state a i 
   | Pub _ -> ()
   | Neg p -> remove_child state p n
   | Add(p1,p2) | Mul(p1,p2) ->
@@ -367,14 +386,28 @@ let find_share state k =
       if k < pinfo.Pinfo.nb_used_shares then raise (FoundShare pinfo))
     state.s_params
 
-let continue state k = 
+let continue_k k state = 
   try find_share state k; false
   with FoundShare _ -> true
 
-let simplify_until state k = 
-  while continue state k && simplify state do () done;
-  not (continue state k)
-
+let continue_spini k state = 
+  if continue_k k state then true
+  else 
+    let u = 
+      Hv.fold (fun _p pinfo s -> SmallSet.union pinfo.Pinfo.used_shares s)  state.s_params SmallSet.empty in
+    k < SmallSet.card u
+    
+let rec simplify_until (continue: state -> bool) state = 
+  let c = continue state in
+  if c then
+    let b = simplify state in
+    if b then simplify_until continue state 
+    else false
+  else true
+(*
+  while continue state && simplify state do () done;
+  not (continue state)
+*)
 
 
   
@@ -435,16 +468,12 @@ let clear_bijection state =
 (* ----------------------------------------------------------------------- *)
 
 let used_share = 
-  let hn = Hn.create 100 in
   fun state -> 
-  Hn.clear hn;
-  Hv.iter 
-    (fun _ pinfo -> 
-      Pinfo.iter 
-        (fun na -> if Vector.size na.children <> 0 then Hn.add hn na ()) 
-        pinfo)
-    state.s_params;
-  fun n -> Hn.mem hn n
+  let pi = Hv.copy state.s_params in
+  fun p i -> 
+    try SmallSet.mem i (Hv.find pi p).used_shares 
+    with Not_found -> false 
+
 
 (* ----------------------------------------------------------------------- *)
 
@@ -452,9 +481,10 @@ exception Found of node
 
 let find_used_share_except state excepted = 
   try
-    Hv.iter (fun _ pinfo -> 
-      Pinfo.iter (fun na -> 
-          if Vector.size na.children <> 0 && not (excepted na) then
+    Hv.iter (fun p pinfo -> 
+      Pinfo.iter (fun i -> 
+          if not (excepted p i) then
+            let na = (Hv.find state.s_shares p).(i) in
             raise (Found na)) pinfo) state.s_params;
     assert false
   with Found n -> n
@@ -464,9 +494,9 @@ let remove_used_share_except state excepted =
   remove_node_and_all_children state na
 
 
-let simplify_until_with_clear state excepted k = 
+let rec simplify_until_with_clear continue state excepted = 
 (*  Format.eprintf "simplify_until %a@." pp_state state; *)
-  while continue state k do 
+  while continue state do 
     if not (simplify state) then 
       remove_used_share_except state excepted;
 (*    Format.eprintf "simplify_until %a@." pp_state state; *)

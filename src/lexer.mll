@@ -25,6 +25,7 @@
     "randoms", RANDOMS;
     "NI"     , NI "";
     "SNI"    , SNI "";
+    "SPINI"  , SPINI "";
     "Probing", PROBING "";
     "print", PRINT "";
     "read_file" , READ_FILE "";
@@ -70,6 +71,7 @@ rule main = parse
                  match token with
                  | NI _         -> NI (to_string lexbuf)
                  | SNI _        -> SNI (to_string lexbuf) 
+                 | SPINI _      -> SPINI (to_string lexbuf)
                  | PROBING _    -> PROBING (to_string lexbuf) 
                  | PRINT _      -> PRINT (to_string lexbuf)
                  | READ_FILE _  -> READ_FILE (to_string lexbuf) 

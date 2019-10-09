@@ -250,7 +250,60 @@ module Vector = struct
     aux 0
 
 end
-   
+(* ----------------------------------------------------------------- *)
+
+module SmallSet = struct
+  type t = int
+  let empty = 0 
+  let is_empty s = s = 0
+
+  let inter s1 s2 = s1 land s2
+  let union s1 s2 = s1 lor s2
+  let singleton i = (* assert (0 <= i && i < 63); *) 1 lsl i
+  let diff s1 s2 = inter s1 (lnot s2)
+
+  let add s i = union s (singleton i)
+  let remove s i = diff s (singleton i)
+
+  let mem i s = not (is_empty (inter s (singleton i)))
+
+  let rec card s = 
+    match s with
+    | 0 -> 0
+    | 1 -> 1
+    | 2 -> 1
+    | 3 -> 2
+    | 4 -> 1
+    | 5 -> 2
+    | 6 -> 2
+    | 7 -> 3
+    | 8 -> 1
+    | 9 -> 2
+    | 10 -> 2
+    | 11 -> 3
+    | 12 -> 2
+    | 13 -> 3
+    | 14 -> 3
+    | 15 -> 4
+    | _  -> card (s land 0xF) + card (s lsr 4)
+
+  let iter f s = 
+    let rec aux i f s = 
+      if s <> 0 then 
+        begin
+          if s land 1 = 1 then f i;
+          aux (i+1) f (s lsr 1)
+        end in
+    aux 0 f s 
+
+  let fold f a s =
+    let rec aux i f a s =
+      if s <> 0 then 
+        aux (i+1) f (f i a) (s lsr 1)
+      else a in
+    aux 0 f a s
+end 
+
 (* ----------------------------------------------------------------- *)
 
 type location = {

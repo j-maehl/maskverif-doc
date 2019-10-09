@@ -83,6 +83,7 @@ type command =
   | Func       of func
   | NI         of ident * checker_options
   | SNI        of ident * (int * int) option * checker_options
+  | SPINI      of ident * (int * int) option * checker_options
   | Probing    of ident * checker_options
   | Read_file  of string located
   | Read_ilang of string located

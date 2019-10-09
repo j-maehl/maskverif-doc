@@ -5,7 +5,7 @@
 
 %}
 %token PROC END PUBLIC INPUTS OUTPUTS SHARES RANDOMS
-%token <string>SNI NI PROBING PRINT 
+%token <string>SNI NI PROBING SPINI PRINT 
 %token <string>READ_FILE READ_ILANG
 %token TRANSITION NOGLITCH PARA ORDER VERBOSE NOBOOL NOPRINT
 %token <string> IDENT
@@ -158,6 +158,7 @@ command1:
   | f=func                               { Func f }
   | o=check_opt* f=loc(NI)               { NI (f,o) }
   | o=check_opt* b=sni_bound? f=loc(SNI) { SNI (f,b,o) }
+  | o=check_opt* b=sni_bound? f=loc(SPINI) { SPINI (f,b,o) }
   | o=check_opt* f=loc(PROBING)          { Probing (f,o) }
   | f=loc(READ_FILE)                     { Read_file f  }
   | f=loc(READ_ILANG)                    { Read_ilang f }

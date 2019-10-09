@@ -40,19 +40,18 @@ val simplified_expr : ?notfound:bool -> state -> expr -> expr
 (* [simplify_until state k] 
    try to simplify the state until the top expression depend of at most 
    k share of each input, return true if it success *)
-val simplify_until : state -> int -> bool 
-
+val simplify_until : (state -> bool) -> state -> bool 
+val continue_k : int -> state -> bool
+val continue_spini : int -> state -> bool
 type bijection
 val get_bij : state -> bijection
 val replay_bij : state -> bijection -> unit
 
 val clear_bijection : state -> unit 
 
-val used_share : state -> node -> bool
+val used_share : state -> (param -> int -> bool)
 
-
-
-val simplify_until_with_clear : state -> (node -> bool) -> int -> unit 
+val simplify_until_with_clear : (state -> bool) -> state -> (param -> int -> bool) -> unit 
 
 (*
 exception CanNotCheck of expr list 

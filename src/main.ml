@@ -129,6 +129,17 @@ let check_sni f b o =
     Prog.build_obs_func ~trans:o.trans ~glitch:o.glitch ~ni:`SNI (loc f) func in
   let order = mk_order o nb_shares in
   Checker.check_sni o.option ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares ~order interns outputs 
+ 
+let check_spini f b o =
+  let from, to_ = 
+    match b with None -> None, None | Some (i,j) -> Some i, Some j in
+  let func = Prog.get_global globals f in
+  Format.printf "Checking SNI for %s: %a@." (data f) pp_option o;
+  let (params, nb_shares, interns, outputs) = 
+    Prog.build_obs_func ~trans:o.trans ~glitch:o.glitch ~ni:`SNI (loc f) func in
+  let order = mk_order o nb_shares in
+  Checker.check_spini o.option ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares ~order interns outputs 
+
   
 let pp_added func = 
   Format.printf "proc %s added@." func.Prog.f_name.Expr.v_name
@@ -139,6 +150,7 @@ let rec process_command c =
     pp_added (Prog.Process.func globals f)
   | NI (f,o)     -> check_ni f (process_check_opt o)
   | SNI (f,b,o)  -> check_sni f b (process_check_opt o)
+  | SPINI(f,b,o) -> check_spini f b (process_check_opt o)                  
   | Probing(f,o) -> check_threshold f (process_check_opt o)
   | Read_file filename ->
     Format.eprintf "read_file %s@." (data filename);
