@@ -1,6 +1,6 @@
 open Util
 
-let rec lex cmp l1 l2 = 
+let rec lex cmp l1 l2 =
   match l1, l2 with
   | [], [] -> 0
   | _, []  -> 1
@@ -11,38 +11,38 @@ let rec lex cmp l1 l2 =
     | x -> x
 
 module type VAR = sig
-  type t 
+  type t
   val equal   : t -> t -> bool
   val compare : t -> t -> int
-  val pp: Format.formatter -> t -> unit 
+  val pp: Format.formatter -> t -> unit
 end
 
-exception NotDivisible 
+exception NotDivisible
 exception DivByZero
 exception NotDepend
 
 module Poly(V:VAR) = struct
   type var = V.t
-  
-  module M (* : sig 
-    type t 
-    val compare : t -> t -> int 
-    val one : t 
+
+  module M (* : sig
+    type t
+    val compare : t -> t -> int
+    val one : t
     val mul : t -> t -> t
     val of_var : var -> t
     val of_vars : var list -> t
-     
+
     (* [div a b = q] if a = q * b *)
-    val div : t -> t -> t 
+    val div : t -> t -> t
 
-  end *) = struct 
+  end *) = struct
 
-    type t = var list 
+    type t = var list
 
-    let equal m1 m2 = 
-      List.equal V.equal m1 m2 
-     
-    let rec compare m1 m2 = 
+    let equal m1 m2 =
+      List.equal V.equal m1 m2
+
+    let rec compare m1 m2 =
       match m1, m2 with
       | [], [] -> 0
       | [], _::_ -> -1
@@ -51,10 +51,10 @@ module Poly(V:VAR) = struct
         let cmp = compare m1 m2 in
         if cmp = 0 then V.compare x1 x2
         else cmp
- 
-    let one = [] 
 
-    let rec mul m1 m2 = 
+    let one = []
+
+    let rec mul m1 m2 =
       match m1, m2 with
       | [], _ -> m2
       | _, [] -> m1
@@ -62,13 +62,13 @@ module Poly(V:VAR) = struct
         match V.compare x1 x2 with
         | 0 -> x1 :: mul m1' m2'
         | c when c < 0 -> x2:: mul m1 m2'
-        | _ -> x1:: mul m1' m2 
+        | _ -> x1:: mul m1' m2
 
     let of_var x = [x]
 
     let of_vars = List.sort_uniq (fun x1 x2 -> -V.compare x1 x2)
 
-    let rec div a b = 
+    let rec div a b =
       match a, b with
       | _, [] -> a
       | [], _ -> raise NotDivisible
@@ -82,20 +82,20 @@ module Poly(V:VAR) = struct
       try Some (div a b)
       with NotDivisible -> None
 
-    let rec divx a x = 
+    let rec divx a x =
       match a with
       | [] -> raise NotDivisible
       | x1::a ->
         if V.compare x x1 = 0 then a
-        else x1:: divx a x 
+        else x1:: divx a x
 
-    let dependx x m = 
-      List.exists (fun x' -> V.compare x x' = 0) m 
+    let dependx x m =
+      List.exists (fun x' -> V.compare x x' = 0) m
 
     let eval rho m = List.for_all rho m
 
-    let pp fmt m = 
-      match m with 
+    let pp fmt m =
+      match m with
       | [] -> Format.fprintf fmt "1"
       | _ -> Format.fprintf fmt "@[%a@]" (pp_list " *@ " V.pp) m
 
@@ -105,26 +105,26 @@ module Poly(V:VAR) = struct
 
   type t = mon list
 
-  let equal p1 p2 = List.equal M.equal p1 p2 
+  let equal p1 p2 = List.equal M.equal p1 p2
 
-  let pp fmt = Format.fprintf fmt "@[%a@]#" (pp_list " +@ " M.pp) 
+  let pp fmt = Format.fprintf fmt "@[%a@]#" (pp_list " +@ " M.pp)
 
   let zero = []
   let one = [M.one]
 
   let var x = [M.of_var x]
 
-  let rec add p1 p2 = 
+  let rec add p1 p2 =
     match p1, p2 with
     | [], _ -> p2
     | _, [] -> p1
     | m1::p1', m2::p2' ->
       match M.compare m1 m2 with
-      | 0 -> add p1' p2' 
+      | 0 -> add p1' p2'
       | c when c < 0 -> m2 :: add p1 p2'
-      | _ -> m1 :: add p1' p2 
+      | _ -> m1 :: add p1' p2
 
-  let rec insert m1 r = 
+  let rec insert m1 r =
     match r with
     | [] -> [m1]
     | m2::r' ->
@@ -134,15 +134,15 @@ module Poly(V:VAR) = struct
       | _ -> m2 :: insert m1 r'
 
   let mulm m p =
-    if m = M.one then p 
-    else 
-      let rec aux r p = 
+    if m = M.one then p
+    else
+      let rec aux r p =
         match p with
-        | [] -> List.rev r 
+        | [] -> List.rev r
         | m1::p -> aux (insert (M.mul m m1) r) p in
       aux zero p
 
-  let mul p1 p2 = 
+  let mul p1 p2 =
     let rec aux r p1 =
       match p1 with
       | [] -> r
@@ -152,24 +152,24 @@ module Poly(V:VAR) = struct
 
    (* [check_div A B = Q] if A = Q * B + 0 *)
    let div a b =
-     let db = 
+     let db =
        match b with
        | [] -> raise DivByZero
        | db :: _ -> db in
      let rec aux q a =
        match a with
-       | [] -> q 
-       | da ::_ -> 
+       | [] -> q
+       | da ::_ ->
          let m = M.div da db in
          aux (add [m] q) (add a (mulm m b)) in
-     aux zero a 
+     aux zero a
 
    let div_eucl a b =
-     let db = 
+     let db =
        match b with
        | [] -> raise DivByZero
        | db :: _ -> db in
-     let rec aux q a = 
+     let rec aux q a =
   (*     Format.eprintf "q = %a; a = %a; db = %a; b = %a@." pp q pp a M.pp db pp b; *)
        match a with
        | [] -> q, zero
@@ -180,7 +180,7 @@ module Poly(V:VAR) = struct
          | None ->
            q, a in
      aux zero a
-           
+
    let divx a x =
      let q = ref [] in
      let r = ref [] in
@@ -193,17 +193,17 @@ module Poly(V:VAR) = struct
      aux a;
      !q, !r
 
-   (* P = (r + P1) * P2 
-      P = rP2 + P1P2 
+   (* P = (r + P1) * P2
+      P = rP2 + P1P2
       P = rQ + R
       R = Q1Q
-      then 
+      then
       P1 = Q1 and P2 = Q *)
 
    (* [check_rnd p r] return (p1,p2) such that p = (r + p1) * p2
       r should occur in p *)
-   let check_rnd p r = 
-     try 
+   let check_rnd p r =
+     try
        let p2, r = divx p r in
        let p1 = div r p2 in
        Some (p1, p2)
@@ -212,7 +212,7 @@ module Poly(V:VAR) = struct
    (* [check_rnd_eucl r p] return (p1,p2,p3) such that p = (r + p1) * p2 + p3.
       r will not occur in p1 p2 p3.
       r should occur in p *)
-   let check_rnd_eucl r p = 
+   let check_rnd_eucl r p =
      let p2, pr = divx p r in (* p = p2 * r + pr *)
 (*     Format.eprintf "r = %a; p2 = %a; pr = %a@."
        V.pp r pp p2 pp pr; *)
@@ -222,8 +222,8 @@ module Poly(V:VAR) = struct
         p = (r + p1) * p2 + p3 *)
      let p1,p3 = div_eucl pr p2 in
      (p1, p2, p3)
-     
-   let dependx x p = 
+
+   let dependx x p =
      List.exists (M.dependx x) p
 
    let iter_vars f p =
@@ -232,45 +232,40 @@ module Poly(V:VAR) = struct
    let all_vars f p =
      List.for_all (List.for_all f) p
 
-   let exists_vars f p = 
+   let exists_vars f p =
      List.exists (List.exists f) p
 
-   let fold_vars f p = 
+   let fold_vars f p =
      List.fold_left (List.fold_left f) p
 
-   let eval rho p = 
+   let eval rho p =
      List.fold_left (fun r m ->
          let rm = M.eval rho m in
            (r && not rm) || (not r && r)) false p
 
-   let deg p = 
+   let deg p =
      List.fold_left (fun d m -> max d (List.length m)) 0 p
 
 
-   let rec inter p1 p2 = 
+   let rec inter p1 p2 =
      match p1, p2 with
      | [], _ -> []
      | _, [] -> []
      | m1::p1', m2::p2' ->
        match M.compare m1 m2 with
-       | 0 -> m1 :: inter p1' p2' 
+       | 0 -> m1 :: inter p1' p2'
        | c when c < 0 -> inter p1 p2'
-       | _ -> inter p1' p2 
+       | _ -> inter p1' p2
 
-   let rec diff p1 p2 = 
+   let rec diff p1 p2 =
      match p1, p2 with
      | [], _ -> []
      | _, [] -> p1
      | m1::p1', m2::p2' ->
        match M.compare m1 m2 with
-       | 0 -> diff p1' p2' 
+       | 0 -> diff p1' p2'
        | c when c < 0 -> m2 :: diff p1 p2'
-       | _ -> m1 :: diff p1' p2 
+       | _ -> m1 :: diff p1' p2
 
-             
+
 end
-
-
-
-
-

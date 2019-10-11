@@ -7,10 +7,10 @@
 module List = struct
   include List
 
-  let count f = 
-    fold_left (fun n a -> if f a then n+1 else n) 0 
+  let count f =
+    fold_left (fun n a -> if f a then n+1 else n) 0
 
-  let map_size f l = 
+  let map_size f l =
     let size = ref 0 in
     let f x = incr size; f x in
     let l = map f l in
@@ -18,32 +18,32 @@ module List = struct
 
   let is_empty l = l == []
 
-  let rec equal f l1 l2 = 
+  let rec equal f l1 l2 =
     match l1, l2 with
     | [], [] -> true
     | x1::l1, x2::l2 -> f x1 x2 && equal f l1 l2
     | _, _ -> false
 
   let rec split n l =
-    if n <= 0 then ([], l) 
+    if n <= 0 then ([], l)
     else match l with
     | [] -> assert false
     | x::l -> let (l1,l2) = split (n-1) l in (x::l1, l2)
 
 end
 
-let rec partition f lin lout l = 
+let rec partition f lin lout l =
   match l with
   | [] -> lin, lout
-  | e::l -> 
+  | e::l ->
     if f e then partition f (e::lin) lout l
     else partition f lin (e::lout) l
 
-let mk_range_i i j = 
+let mk_range_i i j =
   let i1,j1 = if i <= j then i,j else j,i in
   let l = ref [] in
   for k = j1 downto i1 do
-    l := k :: !l 
+    l := k :: !l
   done;
   if i <= j then !l else List.rev !l
 
@@ -94,8 +94,8 @@ module Mstr = Map.Make(OrderedStr)
 (* ----------------------------------------------------------------------- *)
 module Array = struct
   include Array
-  
-  let for_all f t = 
+
+  let for_all f t =
     let rec aux i = f t.(i) && (i = 0 || aux (i-1)) in
     aux (length t - 1)
 
@@ -105,7 +105,7 @@ module Array = struct
       (n1 = 0 ||
          let rec aux i = f t1.(i) t2.(i) && (i = 0 || aux (i-1)) in
          aux (n1 - 1))
-end 
+end
 
 let finally final f a =
   let res = try f a with e -> final();raise e in
@@ -129,8 +129,8 @@ module Stack = struct
     st_buff = Array.make n a;
     st_top  = 0;
   }
-    
-  let push s a = 
+
+  let push s a =
     let top = s.st_top in
     let len = Array.length s.st_buff in
     if top = len then begin
@@ -144,7 +144,7 @@ module Stack = struct
     s.st_buff.(top) <- a;
     s.st_top <- top + 1
 
-  let pop s = 
+  let pop s =
     let top = s.st_top in
     if top = 0 then raise EmptyStack;
     let top = top - 1 in
@@ -155,15 +155,15 @@ module Stack = struct
 
   let to_list s = Array.to_list (Array.sub s.st_buff 0 s.st_top)
 
-  let iter f s = 
+  let iter f s =
     for i = 0 to s.st_top - 1 do f s.st_buff.(i) done
 
-  let map f s = 
+  let map f s =
     { st_top = s.st_top;
       st_buff = Array.init s.st_top (fun i -> f s.st_buff.(i));
     }
-    
-end 
+
+end
 
 (* -------------------------------------------------------------------- *)
 module Vector = struct
@@ -180,20 +180,20 @@ module Vector = struct
 
   let size v = v.last
 
-  let create size default = 
+  let create size default =
     { last = 0;
       arr  = Array.make size default; }
 
-  let resize v = 
+  let resize v =
     let len = Array.length v.arr in
     if v.last = len then begin
       if len = 0 then assert false;
-      let narr = Array.make (2 * len) v.arr.(0) in 
+      let narr = Array.make (2 * len) v.arr.(0) in
       Array.blit v.arr 1 narr 1 (len - 1);
       v.arr <- narr
     end
 
-  let get v n = 
+  let get v n =
     if 0 <= n && n < v.last then Array.unsafe_get v.arr n
     else raise (Invalid_argument "index out of bounds")
 
@@ -203,45 +203,45 @@ module Vector = struct
         Array.blit v.arr (n+1) v.arr n (v.last - (n+1));
       v.last <- v.last - 1
     end else raise (Invalid_argument "index out of bounds")
-    
-  let push v a = 
+
+  let push v a =
     resize v;
     let n = v.last in
     v.last <- n + 1;
     v.arr.(n) <- a
 
-  let remove test v = 
+  let remove test v =
     let i = ref 0 in
     let j = ref 0 in
     let size = v.last in
     let arr = v.arr in
     while (!i < size) do
       if test arr.(!i) then incr i
-      else 
-        begin 
+      else
+        begin
           if !i <> !j then arr.(!j) <- arr.(!i);
           incr i; incr j
         end
     done;
     v.last <- !j
 
-  let iter f v = 
+  let iter f v =
     for i = 0 to v.last - 1 do f v.arr.(i) done
 
-  let pop v = 
+  let pop v =
     let r = v.arr.(v.last - 1) in
     v.last <- v.last - 1;
     r
- 
-  let top v = 
+
+  let top v =
     v.arr.(v.last - 1)
-    
+
   let dummy () = Obj.magic {
      arr = Array.make 0 1;
      last = 0;
   }
-  
-  let to_list v = 
+
+  let to_list v =
     let l = ref [] in
     for i = v.last - 1 downto 0 do
       l := v.arr.(i) :: !l
@@ -250,12 +250,12 @@ module Vector = struct
 
   let clear v = v.last <- 0
 
-  let exists f v = 
+  let exists f v =
     let rec aux i = i < v.last && (f v.arr.(i) || aux (i+1)) in
     aux 0
 
 end
-   
+
 (* ----------------------------------------------------------------- *)
 
 type location = {
@@ -318,11 +318,11 @@ end = struct
     in
       Printf.sprintf "%s: %s" lc.lc_fname spos
 end
- 
-let warning ?loc fmt = 
+
+let warning ?loc fmt =
   let buf  = Buffer.create 127 in
   let bfmt = Format.formatter_of_buffer buf in
-  let loc = 
+  let loc =
     match loc with
     | None -> ""
     | Some loc -> "at "^(Location.to_string loc) in
@@ -333,7 +333,7 @@ let warning ?loc fmt =
 
 exception Error of (string * Location.t option * string)
 
-let error s loc fmt = 
+let error s loc fmt =
   let buf  = Buffer.create 127 in
   let bfmt = Format.formatter_of_buffer buf in
   Format.kfprintf (fun _ ->
@@ -341,8 +341,8 @@ let error s loc fmt =
     let msg = Buffer.contents buf in
     raise (Error(s,loc,msg))) bfmt fmt
 
-let pp_error fmt (s,loc,msg) = 
-  let pp_loc fmt loc = 
+let pp_error fmt (s,loc,msg) =
+  let pp_loc fmt loc =
     match loc with
     | None -> ()
     | Some loc -> Format.fprintf fmt " at %s" (Location.to_string loc) in
@@ -358,20 +358,20 @@ type hstring = {
     hs_str : string;
   }
 
-module HS = struct 
+module HS = struct
   let id = ref 0
 
-  let tbl = Hashtbl.create 100 
+  let tbl = Hashtbl.create 100
 
   let make s =
-    try Hashtbl.find tbl s 
+    try Hashtbl.find tbl s
     with Not_found ->
       let p = { hs_id = !id; hs_str = s } in
       incr id;
       Hashtbl.add tbl s p;
-      p 
+      p
 
-  type t = hstring 
+  type t = hstring
 
   let equal s1 s2 = s1 == s2
 
@@ -379,25 +379,20 @@ module HS = struct
 
   let compare s1 s2 = s1.hs_id - s2.hs_id
 
+  let pp full fmt s = 
+    if full then
+      Format.fprintf fmt "%s#%i" s.hs_str s.hs_id
+    else  Format.fprintf fmt "%s" s.hs_str
 end
 
-let _DFF_P_     = HS.make "$_DFF_P_"
-let _DFF_PP0_   = HS.make "$_DFF_PP0_"
-let _DFFSR_PPP_ = HS.make "$_DFFSR_PPP_"
-let _DFF_PN0_   = HS.make "$_DFF_PN0_"
 
-let is_FF_op o = 
-  HS.equal o _DFF_PP0_ || HS.equal o _DFFSR_PPP_ || HS.equal o _DFF_PN0_
 
-let _TUPLE_     = HS.make ""     
-
-    
 (* ----------------------------------------------------------------- *)
 
-let pp_z fmt z = 
+let pp_z fmt z =
   let s = Z.to_string z in
   let len = String.length s in
-  let s' = 
+  let s' =
     let m = len mod 3 in
     if m = 0 then ""
     else String.make (3 - m) '0' in
@@ -408,7 +403,7 @@ let pp_z fmt z =
     for j = 0 to 2 do
       Format.fprintf fmt "%c" s.[i*3 + j]
     done;
-    if i <> k-1 then Format.fprintf fmt "," 
+    if i <> k-1 then Format.fprintf fmt ","
   done
 
 let pp_human suffix fmt num =
@@ -430,14 +425,14 @@ let pp_human suffix fmt num =
   | Some fcr ->
       Format.fprintf fmt "%s.%0.3d %s"
         (Z.to_string !num) (Z.to_int fcr) suffix
-      
+
 
 (* ------------------------------------------------------------- *)
-let verbosity = ref 0 
+let verbosity = ref 0
 
 let set_verbose i = verbosity := i
 
-let fverbose i = 
+let fverbose i =
   if i <= !verbosity then Format.fprintf else Format.ifprintf
 
 let everbose i = fverbose i Format.err_formatter
@@ -451,4 +446,3 @@ type tool_opt = {
     pp_error  : bool;
     checkbool : bool;
   }
-

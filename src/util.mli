@@ -16,7 +16,7 @@ module List : sig
 val partition :
   ('a -> bool) -> 'a list -> 'a list -> 'a list -> 'a list * 'a list
 
-val mk_range_i : int -> int -> int list 
+val mk_range_i : int -> int -> int list
 (* ----------------------------------------------------------------------- *)
 type 'a pp = Format.formatter -> 'a -> unit
 
@@ -44,19 +44,19 @@ module Array : sig
     include module type of Array
 
     val for_all : ('a -> bool) -> 'a array -> bool
-    val for_all2 : ('a -> 'b -> bool) -> 'a array -> 'b array -> bool 
+    val for_all2 : ('a -> 'b -> bool) -> 'a array -> 'b array -> bool
   end
 
 (* ----------------------------------------------------------------------- *)
 exception EmptyStack
 
-module Stack : 
-  sig 
+module Stack :
+  sig
     type 'a t
     val make : int  -> 'a -> 'a t
     val push : 'a t -> 'a -> unit
-    val pop  : 'a t -> 'a 
-    val clear: 'a t -> unit 
+    val pop  : 'a t -> 'a
+    val clear: 'a t -> unit
     val copy : 'a t -> 'a t
     val to_list : 'a t -> 'a list
     val iter : ('a -> unit) -> 'a t -> unit
@@ -67,27 +67,27 @@ module Stack :
 val finally : (unit -> 'a) -> ('b -> 'c) -> 'b -> 'c
 
 (* ----------------------------------------------------------------------- *)
-module Vector : sig 
-  type 'a t 
+module Vector : sig
+  type 'a t
 
   val dummy  : unit -> 'a t
   val create : int -> 'a -> 'a t
   val copy   : 'a t -> 'a t
-  val clear  : 'a t -> unit 
+  val clear  : 'a t -> unit
   val get    : 'a t -> int -> 'a
   val push   : 'a t -> 'a -> unit
   val size   : 'a t -> int
-  val pop    : 'a t -> 'a 
+  val pop    : 'a t -> 'a
   val top    : 'a t -> 'a
 
   (* remove all elements satisfying the predicate *)
   val remove : ('a -> bool) -> 'a t -> unit
-  val unset  : 'a t -> int -> unit                                         
+  val unset  : 'a t -> int -> unit
 
   val iter   : ('a -> unit) -> 'a t -> unit
   val exists : ('a -> bool) -> 'a t -> bool
 
-  val to_list : 'a t -> 'a list                                       
+  val to_list : 'a t -> 'a list
 end
 
 (* ------------------------------------------------------------------------ *)
@@ -105,8 +105,8 @@ type 'a located = { pl_data: 'a; pl_location: location; }
 
 val mkloc : location -> 'a -> 'a located
 
-val loc  : 'a located -> location 
-val data : 'a located -> 'a 
+val loc  : 'a located -> location
+val data : 'a located -> 'a
 
 (* -------------------------------------------------------------------- *)
 
@@ -118,18 +118,18 @@ module Location : sig
   val make      : position -> position -> t
   val of_lexbuf : lexbuf -> t
   val to_string : t -> string
-end 
+end
 
-val warning : 
+val warning :
   ?loc:Location.t -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
 
 exception Error of (string * Location.t option * string)
 
-val error : 
+val error :
   string -> Location.t option -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 
-val pp_error : 
+val pp_error :
   Format.formatter -> string * Location.t option * string -> unit
 
 (* -------------------------------------------------------------------- *)
@@ -146,34 +146,27 @@ module HS : sig
 
   val make : string -> hstring
 
-  type t = hstring 
+  type t = hstring
 
   val equal : t -> t -> bool
 
-  val hash : t -> int 
+  val hash : t -> int
 
-  val compare : t -> t -> int 
+  val compare : t -> t -> int
 
+  val pp : bool -> t pp  
 end
-
-val _DFF_P_ : HS.t
-val _DFF_PP0_ : HS.t
-val _DFF_PN0_ : HS.t
-val _DFFSR_PPP_ : HS.t
-val is_FF_op : HS.t -> bool
-
-val _TUPLE_ : HS.t
 
 (* --------------------------------------------------------- *)
 val pp_z : Format.formatter -> Z.t -> unit
 val pp_human : string -> Format.formatter -> Z.t -> unit
 
 (* --------------------------------------------------------- *)
-val fverbose : 
+val fverbose :
   int -> Format.formatter -> ('a, Format.formatter, unit) format -> 'a
 val everbose : int -> ('a, Format.formatter, unit) format -> 'a
 val verbose  : int -> ('a, Format.formatter, unit) format -> 'a
-val set_verbose : int -> unit 
+val set_verbose : int -> unit
 
 (* -------------------------------------------------------------- *)
 
@@ -181,4 +174,3 @@ type tool_opt = {
     pp_error  : bool;
     checkbool : bool;
   }
-

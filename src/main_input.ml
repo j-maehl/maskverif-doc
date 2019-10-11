@@ -1,7 +1,7 @@
 open Util
 open Parsetree
 
-module Parse = struct 
+module Parse = struct
 
   module P = Parser
   module L = Lexing
@@ -21,15 +21,15 @@ module Parse = struct
 
   let parse_file = fun () ->
     MenhirLib.Convert.Simplified.traditional2revised Parser.file
-    
+
   type parser_t =
     (P.token * L.position * L.position, unit list)
       MenhirLib.Convert.revised
-    
+
   let lexer lexbuf = fun () ->
     let token = Lexer.main lexbuf in
     (token, L.lexeme_start_p lexbuf, L.lexeme_end_p lexbuf)
-    
+
   let from_channel parse ~name channel =
     let lexbuf = lexbuf_from_channel name channel in
     parse () (lexer lexbuf)
@@ -39,8 +39,8 @@ module Parse = struct
     finally
       (fun () -> close_in channel)
       (from_channel parse ~name:filename) channel
-  
-  let process_file filename = 
+
+  let process_file filename =
     let decl = from_file parse_file filename in
     decl
 
@@ -53,7 +53,7 @@ end
 (* ----------------------------------------------------------- *)
 
 open Checker
-  
+
 let globals = Hashtbl.create 107
 
 type check_opt = {
@@ -64,7 +64,7 @@ type check_opt = {
    option    : Util.tool_opt;
   }
 
-let process_check_opt os = 
+let process_check_opt os =
   let trans = ref false in
   let glitch = ref true in
   let para = ref false in
@@ -73,10 +73,10 @@ let process_check_opt os =
   let print = ref true in
   let doit = function
     | Transition -> trans := true
-    | NoGlitch -> glitch := false 
+    | NoGlitch -> glitch := false
     | Para -> para := true
     | Order n -> order := Some n
-    | NoBool -> bool := false 
+    | NoBool -> bool := false
     | NoPrint -> print := false in
   List.iter doit os;
   { trans  = !trans;
@@ -86,59 +86,69 @@ let process_check_opt os =
     option = { pp_error = !print; checkbool = !bool; };
   }
 
-let mk_order o nb_shares = 
+let mk_order o nb_shares =
   match o.order with
   | None -> nb_shares - 1
   | Some i -> i
 
-let pp_option fmt o = 
+let pp_option fmt o =
   Format.fprintf fmt "(%stransition,%sglitch)"
   (if o.trans then "" else "no ")
   (if o.glitch then "" else "no ")
 
-let check_ni f o = 
+let check_ni f o =
   let func = Prog.get_global globals f in
   Format.printf "Checking NI for %s: %a@." (data f) pp_option o;
-  let (params, nb_shares, all, _) = 
+  let (params, nb_shares, all, _) =
     Prog.build_obs_func ~trans:o.trans ~glitch:o.glitch ~ni:`NI (loc f) func in
 (*  Format.printf "@[<v>observations:@ %a@]@." Checker.pp_eis all; *)
   let order = mk_order o nb_shares in
   Checker.check_ni ~para:o.para ~fname:(data f) o.option params ~order nb_shares all
 
-let check_threshold f o = 
+let check_threshold f o =
   let func = Prog.get_global globals f in
-  let nb_shares = 
+  let nb_shares =
     match func.Prog.f_in with
-    | (_,xs) :: _ -> List.length xs 
+    | (_,xs) :: _ -> List.length xs
     | _           -> assert false in
   Format.printf "Checking Threshold for %s: %a@." (data f) pp_option o;
   let func = Prog.threshold func in
 (*  Format.printf "%a@." (Prog.pp_func ~full:Prog.var_pinfo) func; *)
-  let (params, _, all, _) = 
+  let (params, _, all, _) =
     Prog.build_obs_func ~trans:o.trans ~glitch:o.glitch ~ni:`Threshold (loc f) func in
   let order = mk_order o nb_shares in
  (* Format.printf "@[<v>observations:@ %a@]@." Checker.pp_eis all; *)
   Checker.check_threshold o.option ~para:o.para order params all
-             
+
 let check_sni f b o =
-  let from, to_ = 
+  let from, to_ =
     match b with None -> None, None | Some (i,j) -> Some i, Some j in
   let func = Prog.get_global globals f in
   Format.printf "Checking SNI for %s: %a@." (data f) pp_option o;
-  let (params, nb_shares, interns, outputs) = 
+  let (params, nb_shares, interns, outputs) =
     Prog.build_obs_func ~trans:o.trans ~glitch:o.glitch ~ni:`SNI (loc f) func in
 (*    Format.printf "@[<v>interns:@ %a@]@." Checker.pp_eis interns;
     Format.printf "@[<v>outputs:@ %a@]@." Checker.pp_eis outputs;  *)
   let order = mk_order o nb_shares in
-  Checker.check_sni o.option ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares ~order interns outputs 
-  
-let pp_added func = 
-  Format.printf "proc %s added@." func.Prog.f_name.Expr.v_name
+  Checker.check_sni o.option ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares ~order interns outputs
+
+let pp_added func =
+  Format.printf "proc %a added@." (HS.pp false) func.Prog.f_name
 (*  Format.printf "%a@." (Prog.pp_func ~full:Prog.dft_pinfo) func *)
 
+let add_operator o ty bij = 
+  match List.rev ty with
+  | [] -> assert false
+  | ty::tys -> 
+    try ignore (Expr.Op.find (data o)); error "" (Some(loc o)) "duplicate operator %s" (data o)
+    with Not_found ->
+    let o = Expr.Op.make (data o) (Some(List.rev tys, ty)) bij Expr.Other in
+    Format.printf "operator %s added@." o.Expr.op_name
 
-let rec process_command c = 
+let rec process_command c =
   match c with
+  | Operator (o, ty, bij) ->
+    add_operator o ty bij
   | Func f ->
     pp_added (Prog.Process.func globals f)
   | NI (f,o)     -> check_ni f (process_check_opt o)
@@ -150,32 +160,32 @@ let rec process_command c =
   | Read_ilang filename ->
     Format.eprintf "read_ilang %s@." (data filename);
     let func = Ilang.process_file (data filename) in
-    Prog.add_global globals func 
-  | Print f -> 
+    Prog.add_global globals func
+  | Print f ->
     let func = Prog.get_global globals f in
     Format.printf "%a@." (Prog.pp_func ~full:Prog.dft_pinfo) func
   | Verbose i -> Util.set_verbose (data i)
-  | Exit -> 
+  | Exit ->
     Format.eprintf "Bye bye!@.";
     exit 0
 
-and process_file filename = 
+and process_file filename =
   let cs = Parse.process_file (data filename) in
   List.iter process_command cs
-  
+
 let main =
-  while true do 
-    try 
+  while true do
+    try
       Format.printf ">"; Format.print_flush ();
       let c = Parse.process_command () in
       process_command c
-    with 
-    | ParseError (l,s) -> 
+    with
+    | ParseError (l,s) ->
       let s = match s with Some s -> s | None -> "" in
       Format.eprintf "Parse error at %s: %s@." (Location.to_string l) s;
       exit 1
     | LexicalError (l,s) ->
-      let pp_loc fmt loc = 
+      let pp_loc fmt loc =
         match loc with
         | None -> ()
         | Some loc -> Format.fprintf fmt " at %s" (Location.to_string loc) in
@@ -184,4 +194,3 @@ let main =
     | Util.Error e ->
       Format.eprintf "%a@." Util.pp_error e
   done
-

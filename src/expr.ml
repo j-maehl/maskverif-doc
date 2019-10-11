@@ -1,39 +1,58 @@
 open Util
 
+type ty = W1 | W8 | W16 | W32 | W64
+
+let w1  = W1 
+let w8  = W8
+let w16 = W16
+let w32 = W32
+let w64 = W64
+
+let ty_size = function
+  | W1  -> 1
+  | W8  -> 8
+  | W16 -> 16
+  | W32 -> 32
+  | W64 -> 64
+
+let ty2string ty = "w" ^ string_of_int (ty_size ty)
+  
+(* ----------------------------------------------------------------------- *)
 type var = {
   v_id   : int;
   v_name : string;
+  v_ty   : ty;
 }
 
-module V = struct 
+module V = struct
 
-  let id = ref 0 
+  let id = ref 0
 
- (* let tbl = Hashtbl.create 100 
+ (* let tbl = Hashtbl.create 100
 
   let mk_var s =
-    try Hashtbl.find tbl s 
+    try Hashtbl.find tbl s
     with Not_found ->
       let p = { v_id = !id; v_name = s } in
       incr id;
       Hashtbl.add tbl s p;
       p *)
 
-  let mk_var s =
-    let p = { v_id = !id; v_name = s } in
+  let mk_var s ty =
+    let p = { v_id = !id; v_name = s; v_ty = ty } in
     incr id;
-    p 
-    
-  let clone v = mk_var v.v_name
+    p
 
-  type t = var 
+  let clone v = mk_var v.v_name v.v_ty
+
+  type t = var
 
   let equal v1 v2 = v1 == v2
 
   let hash v = v.v_id
 
   let compare v1 v2 = v1.v_id - v2.v_id
-    
+
 end
 
 module Sv = Set.Make(V)
@@ -43,34 +62,158 @@ module Hv = Hashtbl.Make(V)
 (* ----------------------------------------------------------------------- *)
 
 type rnd = var
-type param = var 
+type param = var
 
-let pp_var fmt v = Format.fprintf fmt "%s" v.v_name 
+let pp_var fmt v = Format.fprintf fmt "%s" v.v_name
 
 let pp_rnd fmt r = Format.fprintf fmt "$%a" pp_var r
 
-let pp_share fmt (p,s,v) = 
+let pp_share fmt (p,s,v) =
   Format.fprintf fmt "%a.[%i]/%a/" pp_var p s pp_var v
 
 (* ----------------------------------------------------------------------- *)
+type op_kind = Add | Mul | Neg | Other
 
-type operator = hstring 
+type operator = {
+  op_id    : int;
+  op_name  : string;
+  op_ty    : (ty list * ty) option;
+  op_bij   : bool; (* true means  bijective *)
+  op_kind  : op_kind
+}
+
+module Op = struct
+  let id = ref 0
+
+  let tbl = Hashtbl.create 100
+          
+  let make s ty bij kind =
+    if Hashtbl.mem tbl s then error "" None "duplicate operator %s" s;
+    incr id;
+    let o = {
+        op_id = !id;
+        op_name = s;
+        op_ty = ty;
+        op_bij = bij;
+        op_kind = kind;
+      } in
+    Hashtbl.add tbl s o; o
+
+  let find s = Hashtbl.find tbl s
+
+  let equal o1 o2 = o1 == o2
+  let hash o = o.op_id
+  
+end
+
+
+(* ----------------------------------------------------------------------- *)
+
+let mk_add t s = Op.make s (Some ([t;t], t)) true  Add
+let mk_mul t s = Op.make s (Some ([t;t], t)) false Mul
+let mk_neg t s = Op.make s (Some ([t],t))    true  Neg 
+
+
+let o_addb   = mk_add w1  "^"
+let o_addw8  = mk_add w8  "^w8"
+let o_addw16 = mk_add w16 "^w16"
+let o_addw32 = mk_add w32 "^w32"
+let o_addw64 = mk_add w64 "^w64"
+
+let o_mulb   = mk_mul w1  "&"
+let o_mulw8  = mk_mul w8  "&w8"
+let o_mulw16 = mk_mul w16 "&w16"
+let o_mulw32 = mk_mul w32 "&w32"
+let o_mulw64 = mk_mul w64 "&w64"
+
+let o_negb   = mk_neg w1  "~"
+let o_negw8  = mk_neg w8  "~w8"
+let o_negw16 = mk_neg w16 "~w16"
+let o_negw32 = mk_neg w32 "~w32"
+let o_negw64 = mk_neg w64 "~w64"
+
+let o_neg = function
+  | W1  -> o_negb
+  | W8  -> o_negw8
+  | W16 -> o_negw16
+  | W32 -> o_negw32
+  | W64 -> o_negw64
+
+let o_add = function
+  | W1  -> o_addb
+  | W8  -> o_addw8
+  | W16 -> o_addw16
+  | W32 -> o_addw32
+  | W64 -> o_addw64
+
+let o_mul = function
+  | W1  -> o_mulb
+  | W8  -> o_mulw8
+  | W16 -> o_mulw16
+  | W32 -> o_mulw32
+  | W64 -> o_mulw64
+
+let o_tuple = Op.make "" None false Other
+
+let _DFF_P_     = Op.make "$_DFF_P_" (Some([w1;w1],w1)) false Other
+let _DFF_PP0_   = Op.make "$_DFF_PP0_" (Some([w1;w1;w1],w1)) false Other
+let _DFFSR_PPP_ = Op.make "$_DFFSR_PPP_" (Some([w1;w1;w1],w1)) false Other
+let _DFF_PN0_   = Op.make "$_DFF_PN0_" (Some([w1;w1;w1;w1],w1)) false Other
+
+let is_FF_op o =
+  Op.equal o _DFF_PP0_ || Op.equal o _DFFSR_PPP_ || Op.equal o _DFF_PN0_
+
+(* ----------------------------------------------------------------------- *)
+
+type constant = {
+    c_ty : ty;
+    c_val : Z.t;
+  }
+
+module C = struct 
+  type t = constant
+
+  let equal c1 c2 = 
+    c1.c_ty == c2 .c_ty && Z.equal c1.c_val c2.c_val 
+
+  let hash c = Z.hash c.c_val 
+
+  let pp fmt c = 
+    if c.c_ty == W1 then 
+      Format.fprintf fmt "%s" (Z.format "%b" c.c_val)
+    else
+      Format.fprintf fmt "%s" (Z.format "%X" c.c_val)
+
+  let zero ty =
+    { c_ty = ty; c_val = Z.zero }
+
+  let one ty = 
+    { c_ty = ty; c_val = Z.pred (Z.shift_left Z.one (ty_size ty)) }
+
+  let make ty z = 
+    assert (Z.leq Z.zero z && Z.lt z (one ty).c_val);
+    { c_ty = ty; c_val = z }
+     
+  let _true = one w1 
+  let _false = zero w1
+
+end
 
 type expr = {
   e_id : int;
   e_node : expr_node}
 
-and expr_node = 
+and expr_node =
 | Etop
 | Ernd   of rnd
 | Eshare of param * int * var (* the var is the original name *)
-| Epub   of var 
-| Eneg   of expr
-| Eadd   of expr * expr
-| Emul   of expr * expr
-| Eop of bool * operator * expr array
+| Epub   of var
+| Eop1   of operator * expr
+| Eop2   of operator * expr * expr
+| Eop    of bool * operator * expr array
   (* Invariant [Eop(b,es)]
        if b is true there is no duplicate in the array es *)
+| Econst of constant
 
 let e_equal e1 e2 = e1 == e2
 let e_hash e = e.e_id
@@ -79,52 +222,54 @@ module HE = struct
 
   type t = expr
 
-  let equal_node n1 n2 = 
-    match n1, n2 with 
+  let equal_node n1 n2 =
+    match n1, n2 with
     | Etop         , Etop          -> true
     | Ernd r1      , Ernd r2       -> V.equal r1 r2
-    | Eshare(p1,i1,v1), Eshare(p2,i2,v2) -> 
+    | Eshare(p1,i1,v1), Eshare(p2,i2,v2) ->
       i1 == i2 && V.equal p1 p2 && V.equal v1 v2
-    | Epub x1      , Epub x2       -> V.equal x1 x2 
-    | Eneg e1      , Eneg e2       -> e_equal e1 e2
-    | Eadd(e11,e12), Eadd(e21,e22) -> e_equal e11 e21 && e_equal e12 e22
-    | Emul(e11,e12), Emul(e21,e22) -> e_equal e11 e21 && e_equal e12 e22
-    | Eop(b1,o1,es1), Eop(b2,o2,es2) -> 
-      b1 = b2 && HS.equal o1 o2 && Array.for_all2 e_equal es1 es2
-    | _                            -> false
+    | Epub x1      , Epub x2       -> V.equal x1 x2
+    | Eop1(o1,e1)  , Eop1(o2,e2)   -> Op.equal o1 o2 && e_equal e1 e2
+    | Eop2(o1,e11,e12), Eop2(o2,e21,e22) -> 
+      Op.equal o1 o2 && e_equal e11 e21 && e_equal e12 e22
+    | Eop(b1,o1,es1), Eop(b2,o2,es2) ->
+      b1 = b2 && Op.equal o1 o2 && Array.for_all2 e_equal es1 es2
+    | Econst c1, Econst c2 -> C.equal c1 c2 
+    | _                    -> false
 
-  let equal e1 e2 = equal_node e1.e_node e2.e_node 
+  let equal e1 e2 = equal_node e1.e_node e2.e_node
 
   let combine h tag = h lsl 3 + tag
   let combine2 h1 h2 tag = combine (combine h1 h2) tag
+  let combine3 h1 h2 h3 tag = combine (combine (combine h1 h2) h3) tag
 
   let hash_node = function
-    | Etop        -> 0
-    | Ernd r      -> combine (V.hash r) 1
+    | Etop          -> 0
+    | Ernd r        -> combine (V.hash r) 1
     | Eshare(p,i,v) -> combine2 (combine (V.hash v) (V.hash p)) i 2
-    | Epub x      -> combine (V.hash x) 3
-    | Eneg e1     -> combine (e_hash e1) 4 
-    | Eadd(e1,e2) -> combine2 (e_hash e1) (e_hash e2) 5
-    | Emul(e1,e2) -> combine2 (e_hash e1) (e_hash e2) 6 
-    | Eop(_b,o,es)   -> 
-      let h = 
-        Array.fold_left (fun h e -> combine h (e_hash e)) (HS.hash o) es in
+    | Epub x        -> combine (V.hash x) 3
+    | Eop1(o1,e1)   -> combine2 (Op.hash o1) (e_hash e1) 4
+    | Eop2(o,e1,e2) -> combine3 (Op.hash o) (e_hash e1) (e_hash e2) 5
+    | Eop(_b,o,es)  ->
+      let h =
+        Array.fold_left (fun h e -> combine h (e_hash e)) (Op.hash o) es in
       combine h 7
+    | Econst(c)     -> C.hash c
 
   let hash e = hash_node e.e_node
 
 end
 
-module E = struct 
+module E = struct
 
   module W = Weak.Make(HE)
 
-  let id = ref 0 
+  let id = ref 0
   let h = W.create 5000
 
   let mk_expr e =
     let e = { e_id = -1; e_node = e } in
-    try W.find h e 
+    try W.find h e
     with Not_found ->
       let e = { e with e_id = !id } in
       W.add h e; incr id;
@@ -137,7 +282,7 @@ module E = struct
   let hash e = e.e_id
 
   let compare e1 e2 = e1.e_id - e2.e_id
-    
+
 end
 
 module He = Hashtbl.Make(E)
@@ -148,11 +293,26 @@ module Me = Map.Make(E)
 
 let top       = E.mk_expr Etop
 let rnd r     = E.mk_expr (Ernd r)
-let pub x     = E.mk_expr (Epub x) 
+let pub x     = E.mk_expr (Epub x)
 let share p i v = E.mk_expr (Eshare(p,i,v))
-let neg e     = E.mk_expr (Eneg e)
-let add e1 e2 = E.mk_expr (Eadd(e1,e2))
-let mul e1 e2 = E.mk_expr (Emul(e1,e2))
+
+let econst c = E.mk_expr (Econst c)
+let ezero ty = econst (C.make ty Z.zero)
+let eone ty = econst (C.make ty Z.one)
+   
+let etrue = econst (C._true)
+let efalse = econst (C._false)
+
+let op1 o e = E.mk_expr (Eop1(o,e))
+let op2 o e1 e2 = E.mk_expr(Eop2(o,e1,e2))
+
+let eneg ty e = op1 (o_neg ty) e
+let eadd ty e1 e2 = op2 (o_add ty) e1 e2
+let emul ty e1 e2 = op2 (o_mul ty) e1 e2
+
+let neg e = op1 o_negb e
+let add e1 e2 = op2 o_addb e1 e2
+let mul e1 e2 = op2 o_mulb e1 e2
 
 let unsafe_op b o es = E.mk_expr (Eop(b,o,es))
 
@@ -162,183 +322,85 @@ let op o es  =
   let n = Array.length es in
   let tbl = He.create (2 * n) in
   let rec check i =
-    n <= i || 
+    n <= i ||
       (not (He.mem tbl es.(i)) &&
          (He.add tbl es.(i) ();check (i+1))) in
   let b = check 0 in
-  unsafe_op b o es 
+  unsafe_op b o es
 
-let is_op_tuple o = HS.equal o _TUPLE_
+let is_op_tuple o = Op.equal o o_tuple
 
-let tuple_nodup es = op_nodup _TUPLE_ es
+let tuple_nodup es = op_nodup o_tuple es
 
-let tuple es = op _TUPLE_ es
+let tuple es = op o_tuple es
 
-let etrue = op (HS.make "1'1") [||]
-let efalse = op (HS.make "1'0") [||]
-
-let is_rnd e = 
+let is_rnd e =
   match e.e_node with
   | Ernd _ -> true
   | _      -> false
-  
+
 (* --------------------------------------------------------------------- *)
+type top = [ `Top |  `AddL | `AddR | `MulL | `MulR | `Not]
+
+let pp_op1 aux fmt o e = 
+  if o.op_kind = Neg then
+    Format.fprintf fmt "%s %a" o.op_name (aux `Not) e
+  else 
+    Format.fprintf fmt "%s(%a)" o.op_name (aux `Top) e
+
+let pp_op2 aux fmt top o e1 e2 = 
+   match o.op_kind with
+   | Add ->
+     begin match top with
+     | `AddR | `MulL | `MulR | `Not ->
+       Format.fprintf fmt "(%a %s %a)" 
+         (aux `AddL) e1 o.op_name (aux `AddR) e2
+     | _ ->
+       Format.fprintf fmt "%a %s %a" 
+         (aux `AddL) e1 o.op_name (aux `AddR) e2
+     end
+   | Mul ->
+     begin match top with
+     | `MulR | `Not ->
+       Format.fprintf fmt "(%a %s %a)" 
+         (aux `MulL) e1 o.op_name (aux `MulR) e2
+     | _ ->
+       Format.fprintf fmt "%a %s %a" 
+         (aux `MulL) e1 o.op_name (aux `MulR) e2
+     end
+   | _   ->
+     Format.fprintf fmt "%s(@[<hov 2>%a,@ %a@])" o.op_name 
+       (aux `Top) e1 (aux `Top) e2
+
+let pp_op aux fmt o es = 
+  if Array.length es <> 0 then
+    Format.fprintf fmt "%s(@[<hov 2>%a@])" o.op_name
+      (pp_list ",@ " (aux `Top)) (Array.to_list es)
+  else
+    Format.fprintf fmt "%s" o.op_name
+
 let pp_expr fmt e =
-  let rec aux top fmt e = 
+  let rec aux top fmt e =
     match e.e_node with
-    | Etop        -> Format.fprintf fmt "TOP"
-    | Ernd r      -> pp_rnd fmt r
-    | Eshare(p,i,v) -> pp_share fmt (p,i,v)
-    | Epub x      -> pp_var fmt x
-    | Eneg e      -> 
-      Format.fprintf fmt "!%a" (aux `Not) e
-    | Eadd(e1,e2) -> 
-      begin match top with
-      | `AddR | `MulL | `MulR | `Not ->
-        Format.fprintf fmt "(%a + %a)" (aux `AddL) e1 (aux `AddR) e2
-      | _ -> 
-        Format.fprintf fmt "%a + %a" (aux `AddL) e1 (aux `AddR) e2
-      end
-    | Emul(e1,e2) -> 
-      begin match top with
-      | `MulR | `Not -> 
-        Format.fprintf fmt "(%a * %a)" (aux `MulL) e1 (aux `MulR) e2
-      | _ ->
-        Format.fprintf fmt "%a * %a" (aux `MulL) e1 (aux `MulR) e2
-      end 
-    | Eop(_, o, es) ->
-      if Array.length es <> 0 then
-        Format.fprintf fmt "%s(@[<hov 2>%a@])" o.hs_str
-          (pp_list ",@ " (aux `Top)) (Array.to_list es) 
-      else 
-        Format.fprintf fmt "%s" o.hs_str in
+    | Etop            -> Format.fprintf fmt "TOP"
+    | Ernd r          -> pp_rnd fmt r
+    | Eshare(p,i,v)   -> pp_share fmt (p,i,v)
+    | Epub x          -> pp_var fmt x
+    | Econst c        -> C.pp fmt c 
+    | Eop1(o, e)      -> pp_op1 aux fmt o e
+    | Eop2(o, e1, e2) -> pp_op2 aux fmt top o e1 e2
+    | Eop(_, o, es)   -> pp_op aux fmt o es in
   aux `Top fmt e
 
-(* ------------------------------------------------------------------------ *)
-(* Boolean checker for independance                                         *)
+(* ---------------------------------------------------------------------- *)
+let type_of_expr e = 
+  match e.e_node with 
+  | Etop -> None
+  | Ernd v | Eshare (_,_,v) | Epub v -> Some v.v_ty
+  | Econst c -> Some c.c_ty
+  | Eop1(op,_) | Eop2(op,_,_) | Eop(_,op,_) -> 
+    match op.op_ty with
+    | Some(_,codom) -> Some(codom)
+    | None -> None
 
-type result = 
-  | Rb of bool
-  | Rtuple of result array
-
-type env = bool He.t 
-    
-let get_val env e = 
-  try He.find env e with Not_found -> assert false
-
-let eval_bool env e = 
-  let tbl = He.create 107 in
-  let rec eval_bool e = 
-    try He.find tbl e 
-    with Not_found -> 
-      let res = match e.e_node with
-        | Etop -> assert false 
-        | Ernd _ | Eshare _ -> Rb (get_val env e)
-        | Epub _ -> Rb true (* FIXME : assert false *)
-        | Eneg e -> 
-          begin match eval_bool e with
-          | Rb b -> Rb (not b)
-          | _    -> assert false
-          end
-        | Eadd (e1,e2) -> 
-          begin match eval_bool e1, eval_bool e2 with
-          | Rb b1, Rb b2 -> Rb (if b1 then not b2 else b2)
-          | _, _         -> assert false
-          end
-        | Emul (e1,e2) -> 
-          begin match eval_bool e1 with
-          | Rb false -> Rb false
-          | Rb true -> eval_bool e2
-          | _       -> assert false
-          end
-        | Eop (_, o, es) ->
-          if is_FF_op o then eval_bool es.(1)
-          else if is_op_tuple o then Rtuple (Array.map eval_bool es)
-          else if E.equal e etrue then Rb true 
-          else if E.equal e efalse then Rb false 
-
-          else 
-            (Format.eprintf "cannot evaluate bool: %a@." pp_expr e;
-             assert false) in
-      He.add tbl e res;
-      res in
-  eval_bool e
-
-
-exception CheckBool (*of 
-   expr list * (result,int) Hashtbl.t * (result,int) Hashtbl.t * bool He.t *)
-
-
-let check_bool (opt:tool_opt) e = 
-  assert (opt.checkbool);
-  (* compute the params and the randoms *)
-  let hp = He.create 10 in
-  let hr = He.create 100 in
-  Format.eprintf "Start boolean checking@.";
-  if opt.pp_error then Format.eprintf "%a@." pp_expr e; 
-  let rec aux e = 
-    match e.e_node with
-    | Etop -> assert false
-    | Ernd _ -> He.replace hr e true
-    | Eshare _ -> He.replace hp e true 
-    | Epub _ -> () (* FIXME 
-                 Format.eprintf "pub %a@." pp_expr e; assert false *)
-    | Eneg e -> aux e
-    | Eadd (e1,e2) | Emul (e1,e2) -> aux e1; aux e2
-    | Eop (_, o, es) ->
-      if HS.equal o _DFF_PP0_ then        aux es.(1)
-      else if HS.equal o _DFFSR_PPP_ then aux es.(1)
-      else if HS.equal o _TUPLE_ then     Array.iter aux es
-      else assert (E.equal e etrue || E.equal e efalse) in
-  aux e;
-  let rs = He.fold (fun e _ els -> e::els) hr [] in
-  let ps = He.fold (fun e _ els -> e::els) hp [] in
-  let get tbl e = try Hashtbl.find tbl e with Not_found -> 0 in
-  let lps, lrs = List.length ps, List.length rs in
-  Format.eprintf "Start boolean checking ps = %i; rs = %i@." lps lrs;
-  let env = hr in
-  List.iter (fun e -> He.replace env e true) ps;
- (* let rec pp_result fmt = function
-    | Rb b -> Format.fprintf fmt "%i" (if b then 1 else 0)
-    | Rtuple rs -> 
-      Format.fprintf fmt "@[(%a)@]" 
-        (pp_list ",@ " pp_result) (Array.to_list rs) in
-  let pp_distr1 fmt r n =
-    Format.fprintf fmt "%a -> %i@ " pp_result r n in
-  let pp_distr fmt tbl = 
-    Format.fprintf fmt "@[<v>distr:@ ";
-    Hashtbl.iter (pp_distr1 fmt) tbl;
-    Format.fprintf fmt "@]"in *)
-  let check_r rs = 
-    Format.eprintf "."; Format.pp_print_flush Format.err_formatter ();
-    let rtbl = Hashtbl.create 100 in
-    let add res = Hashtbl.replace rtbl res (get rtbl res + 1) in
-    let rec check_r rs = 
-      match rs with
-      | [] -> add (eval_bool env e)
-      | r::rs -> 
-        He.replace hr r true; check_r rs;
-        He.replace hr r false; check_r rs in
-    check_r rs;
-(*    Format.eprintf "%a@." pp_distr rtbl; *)
-    rtbl in
-  let ttbl = check_r rs in
-  let check_tbl rtbl = 
-    let check_tr e n =
-      if n <> get rtbl e then 
-        raise CheckBool (* (ps,ttbl,rtbl, env) *) in
-    Hashtbl.iter check_tr ttbl;
-    let check_rt e n = 
-      if n <> get ttbl e then 
-        raise CheckBool (* (ps,ttbl,rtbl, env) *) in
-    Hashtbl.iter check_rt rtbl in
-  let rec check_p ps = 
-    match ps with
-    | [] -> check_tbl (check_r rs) 
-    | p::ps -> 
-        He.replace hr p true; check_p ps;
-        He.replace hr p false; check_p ps in
-  check_p ps;
-  Format.eprintf "@."
-
-
+  
