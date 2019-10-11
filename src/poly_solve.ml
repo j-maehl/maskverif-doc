@@ -75,30 +75,24 @@ let subst x p p' =
 
 let no_rnd = P.all_vars (fun e -> not (is_rnd e)) 
 
-let initial_check_indep k ps = 
+let initial_check_indep (continue:State.t_continue) ps = 
 
   let tbl = Hv.create 101 in
-  let reset () = Hv.clear tbl in
+  let reset () = Hv.iter (fun _ pi -> State.Pinfo.clear pi) tbl in
   let get p = 
     try Hv.find tbl p 
-    with Not_found -> (Sint.empty, 0) in
-  let add p i = 
-    let (si, n) = get p in
-    if Sint.mem i si then ()
-    else 
-      let n = n + 1 in
-      if k < n then raise Depend
-      else
-        Hv.replace tbl p (Sint.add i si, n) in
+    with Not_found -> State.Pinfo.empty () in
+  let add p i = State.Pinfo.add_share i (get p) in
+
   let rec is_indep1 v = 
     match v.e_node with
     | Eshare(p,i,_) -> add p i
     | _ -> () in
   let is_indep depend ps = 
     reset ();
-    try List.iter (P.iter_vars is_indep1) depend; 
-        List.iter (P.iter_vars is_indep1) ps; true
-    with Depend -> false in
+    List.iter (P.iter_vars is_indep1) depend; 
+    List.iter (P.iter_vars is_indep1) ps; 
+    not (continue tbl) in
 
   let rec aux excl depend ps = 
     Format.eprintf "aux@.";
@@ -118,7 +112,7 @@ let initial_check_indep k ps =
 
   aux (He.create 101) [] ps
 
-let check_indep k (es:expr list) =
+let check_indep (continue:State.t_continue) (es:expr list) =
 
   let pol_tbl = He.create 101 in
   let to_pol = to_pol pol_tbl in
@@ -128,4 +122,4 @@ let check_indep k (es:expr list) =
       List.fold_left (fun s e -> to_pol e :: s) s es in
     List.fold_left to_pols [] es in
   
-  initial_check_indep k ps
+  initial_check_indep continue ps

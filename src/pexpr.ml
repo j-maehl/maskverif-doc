@@ -226,29 +226,22 @@ let find_rnd excl ps =
 exception Indep
 exception Depend
 
-let initial_check_indep k ps =
+let initial_check_indep (continue: State.t_continue) ps =
   let tbl = Hv.create 101 in
-  let reset () = Hv.clear tbl in
+  let reset () = Hv.iter (fun _ pi -> State.Pinfo.clear pi) tbl in
   let get p = 
     try Hv.find tbl p 
-    with Not_found -> (Sint.empty, 0) in
+    with Not_found -> State.Pinfo.empty () in
   let add p i = 
-    let (si, n) = get p in
-    if Sint.mem i si then ()
-    else 
-      let n = n + 1 in
-      if k < n then raise Depend
-      else
-        Hv.replace tbl p (Sint.add i si, n) in
+    State.Pinfo.add_share i (get p) in
+
   let rec is_indep1 p = 
     match p with
     | PEvar { e_node = Eshare(p,i,_) } -> add p i
     | PEvar _ -> ()
     | PEadd ps | PEmul ps -> List.iter is_indep1 ps in
   let is_indep ps = 
-    reset ();
-    try List.iter is_indep1 ps; true
-    with Depend -> false in
+    reset (); List.iter is_indep1 ps; not (continue tbl) in
 
   let bij = ref [] in
   let rec reduce excl ps =  
@@ -315,7 +308,7 @@ let to_pol_bij tbl bij =
       p in
   to_pol_bij
 
-let check_indep k (es:expr list) (other: expr list list) = 
+let check_indep continue (es:expr list) (other: expr list list) = 
 
   (* form expr to pexpr *)
 
@@ -328,7 +321,7 @@ let check_indep k (es:expr list) (other: expr list list) =
       List.fold_left (fun s e -> to_pol e :: s) s es in
     List.fold_left to_pols [] es in
 
-  let bij, param_tbl = initial_check_indep k ps in
+  let bij, param_tbl = initial_check_indep continue ps in
 
   (* At this point we known that "bij" allows to prove independence of 
      es.
@@ -349,8 +342,8 @@ let check_indep k (es:expr list) (other: expr list list) =
     match p with
     | PEvar { e_node = Eshare(p,i,_) } -> 
       (try 
-         let (si, _) = Hv.find param_tbl p in
-         Sint.mem i si
+         let pi = Hv.find param_tbl p in
+         SmallSet.mem i pi.State.Pinfo.used_shares
        with Not_found -> false)
     | PEvar _ -> true
     | PEadd ps | PEmul ps -> List.for_all check_depend ps in

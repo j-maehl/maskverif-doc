@@ -103,25 +103,21 @@ module Pinfo = struct
 
   type t = {
     mutable nb_used_shares : int; 
-(*            p_shares       : node Stack.t; *)
     mutable used_shares    : SmallSet.t;
   }
 
-  let init nb_params = 
-    assert (0 <= nb_params && nb_params < 63);
-    {
+  let empty () = {
       nb_used_shares = 0;
-  (*    p_shares = Stack.make nb_params top_node; *)
-      used_shares = SmallSet.empty;
+      used_shares    = SmallSet.empty;
     }
 
-(*  let declare info share =
-    Stack.push info.p_shares share  *)
+  let copy pi = { nb_used_shares = pi.nb_used_shares; used_shares = pi.used_shares }
 
   let add_share i info = 
-    assert (not (SmallSet.mem i info.used_shares));
-    info.nb_used_shares <- info.nb_used_shares + 1;
-    info.used_shares <- SmallSet.add info.used_shares i
+    if (not (SmallSet.mem i info.used_shares)) then begin 
+        info.nb_used_shares <- info.nb_used_shares + 1;
+        info.used_shares <- SmallSet.add info.used_shares i
+      end
 
   let remove_share i info = 
     if (SmallSet.mem i info.used_shares) then begin
@@ -162,7 +158,7 @@ let init_state nb_shares params =
   let s_shares = Hv.create (2 * nb_params) in
   let s_params = Hv.create (2 * nb_params) in
   List.iter (fun p -> 
-    let p_info = Pinfo.init nb_shares in
+    let p_info = Pinfo.empty () in
     let a = Array.make nb_shares top_node in
     Hv.add s_params p p_info;
     Hv.add s_shares p a) params;
@@ -211,9 +207,11 @@ let pp_state fmt state =
     (pp_list "@ " pp_node_id) (Vector.to_list state.s_top);
   Format.fprintf fmt "@[<v> params = ";
   Hv.iter (fun p pinfo ->
-      Format.fprintf fmt "%a:%i;@ " 
+      Format.fprintf fmt "%a:%i;" 
          pp_var p 
-         pinfo.Pinfo.nb_used_shares) state.s_params;
+         pinfo.Pinfo.nb_used_shares;
+      SmallSet.iter (fun i -> Format.fprintf fmt " %i" i) pinfo.Pinfo.used_shares;
+      Format.fprintf fmt "@.") state.s_params;
   Format.fprintf fmt "@]";
   Format.fprintf fmt "@[<h>bijection = %a@]@ "
     (pp_list "@ " 
@@ -225,11 +223,9 @@ let pp_state fmt state =
 (* ----------------------------------------------------------------------- *)  
 
 let add_used_share state p i = 
-  Format.printf "add share %a %i@." Expr.pp_var p i;
   Pinfo.add_share i (Hv.find state.s_params p) 
 
 let rm_used_share state p i = 
-  Format.printf "remove share %a %i@." Expr.pp_var p i;
   Pinfo.remove_share i (Hv.find state.s_params p) 
 
 let declare_share state p i n = 
@@ -380,25 +376,27 @@ let simplify state =
 
 exception FoundShare of Pinfo.t
 
-let find_share state k = 
+let find_share k sparams = 
   Hv.iter 
     (fun _p pinfo -> 
       if k < pinfo.Pinfo.nb_used_shares then raise (FoundShare pinfo))
-    state.s_params
+    sparams
 
-let continue_k k state = 
-  try find_share state k; false
+let continue_k k sparams = 
+  try find_share k sparams; false
   with FoundShare _ -> true
 
-let continue_spini k state = 
-  if continue_k k state then true
+let continue_spini k sparams = 
+  if continue_k k sparams then true
   else 
     let u = 
-      Hv.fold (fun _p pinfo s -> SmallSet.union pinfo.Pinfo.used_shares s)  state.s_params SmallSet.empty in
+      Hv.fold (fun _p pinfo s -> SmallSet.union pinfo.Pinfo.used_shares s)  sparams SmallSet.empty in
     k < SmallSet.card u
     
-let rec simplify_until (continue: state -> bool) state = 
-  let c = continue state in
+type t_continue = Pinfo.t Hv.t -> bool
+
+let rec simplify_until (continue: t_continue) state = 
+  let c = continue state.s_params in
   if c then
     let b = simplify state in
     if b then simplify_until continue state 
@@ -468,10 +466,12 @@ let clear_bijection state =
 (* ----------------------------------------------------------------------- *)
 
 let used_share = 
+  let tbl = Hv.create 100 in
   fun state -> 
-  let pi = Hv.copy state.s_params in
-  fun p i -> 
-    try SmallSet.mem i (Hv.find pi p).used_shares 
+    Hv.clear tbl;
+    Hv.iter (fun p pi -> Hv.add tbl p (Pinfo.copy pi)) state.s_params;
+    fun p i -> 
+    try SmallSet.mem i (Hv.find tbl p).Pinfo.used_shares 
     with Not_found -> false 
 
 
@@ -494,9 +494,9 @@ let remove_used_share_except state excepted =
   remove_node_and_all_children state na
 
 
-let rec simplify_until_with_clear continue state excepted = 
+let rec simplify_until_with_clear (continue:t_continue) state excepted = 
 (*  Format.eprintf "simplify_until %a@." pp_state state; *)
-  while continue state do 
+  while continue state.s_params do 
     if not (simplify state) then 
       remove_used_share_except state excepted;
 (*    Format.eprintf "simplify_until %a@." pp_state state; *)

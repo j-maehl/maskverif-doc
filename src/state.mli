@@ -37,12 +37,30 @@ val simplify : state -> bool
  *) 
 val simplified_expr : ?notfound:bool -> state -> expr -> expr 
 
+module Pinfo : sig 
+
+  type t = {
+    mutable nb_used_shares : int; 
+    mutable used_shares    : SmallSet.t;
+  }
+
+  val empty : unit -> t
+
+  val add_share : int -> t -> unit 
+
+  val remove_share : int -> t -> unit 
+
+  val clear : t -> unit
+end
+
 (* [simplify_until state k] 
    try to simplify the state until the top expression depend of at most 
    k share of each input, return true if it success *)
-val simplify_until : (state -> bool) -> state -> bool 
-val continue_k : int -> state -> bool
-val continue_spini : int -> state -> bool
+type t_continue = Pinfo.t Hv.t -> bool
+
+val simplify_until : t_continue -> state -> bool 
+val continue_k : int -> t_continue
+val continue_spini : int -> t_continue
 type bijection
 val get_bij : state -> bijection
 val replay_bij : state -> bijection -> unit
@@ -51,7 +69,7 @@ val clear_bijection : state -> unit
 
 val used_share : state -> (param -> int -> bool)
 
-val simplify_until_with_clear : (state -> bool) -> state -> (param -> int -> bool) -> unit 
+val simplify_until_with_clear : t_continue -> state -> (param -> int -> bool) -> unit 
 
 (*
 exception CanNotCheck of expr list 

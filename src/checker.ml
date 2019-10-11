@@ -35,7 +35,7 @@ module L : sig
   val set_top_exprs : state -> expr_info list -> unit
   val set_top_exprs2 : state -> ldfs -> unit
 
-  val simplify_ldfs : (state -> bool) -> state -> ldfs -> bool * ldfs
+  val simplify_ldfs : t_continue -> state -> ldfs -> bool * ldfs
 
   val rev_append : ldfs -> ldfs -> ldfs
 
@@ -77,7 +77,7 @@ end = struct
   let set_top_exprs2 state ldfs = 
     List.iter (fun ldf -> set_top_exprs state ldf.l) ldfs
 
-  let simplify_ldfs (continue:state -> bool) state ldfs = 
+  let simplify_ldfs (continue:t_continue) state ldfs = 
     clear_state state;
     set_top_exprs2 state ldfs;
     init_todo state;
@@ -109,13 +109,12 @@ let print_error opt fmt lhd =
       (pp_list ",@ " (fun fmt ei -> pp_expr fmt ei.red_expr)) lhd;
   Format.fprintf fmt "@]"
 
-let find_bij opt _n state (continue:state -> bool) ldfs =
+let find_bij opt _n state (continue:t_continue) ldfs =
   let lhd = L.lfirst ldfs in
   clear_state state;
   L.set_top_exprs state lhd; 
   init_todo state;
   if not (simplify_until continue state) then 
-(*
     let es = List.map (fun ei -> ei.red_expr) lhd in
     let other = 
       List.map 
@@ -125,10 +124,10 @@ let find_bij opt _n state (continue:state -> bool) ldfs =
     Format.eprintf "."; Format.pp_print_flush Format.err_formatter (); 
 
     let etbl = 
-      try Pexpr.check_indep maxparams es other 
+      try Pexpr.check_indep continue es other 
       with Pexpr.Depend ->
         Format.eprintf "start poly@.";
-        let ind = Poly_solve.check_indep maxparams es in
+        let ind = Poly_solve.check_indep continue es in
         Format.eprintf "end poly@.";
 
         if ind then
@@ -136,7 +135,7 @@ let find_bij opt _n state (continue:state -> bool) ldfs =
           List.iter (fun e -> He.replace etbl e ()) es;
           etbl
         else 
-          if opt.checkbool && maxparams = 0 then
+(*          if opt.checkbool && maxparams = 0 then
             begin
               Format.eprintf "Cannot check using gauzz, try to compute distr@.";
               try 
@@ -146,11 +145,11 @@ let find_bij opt _n state (continue:state -> bool) ldfs =
                 etbl
               with Expr.CheckBool -> raise (CanNotCheck lhd) 
             end
-          else raise (CanNotCheck lhd) in 
+          else *) raise (CanNotCheck lhd)  in 
     let is_in ei = He.mem etbl (ei.red_expr) in 
     List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
- *)
-    raise (CanNotCheck lhd)
+ 
+ 
   else
     let used_share = used_share state in
     let bij = get_bij state in
@@ -166,7 +165,7 @@ let find_bij opt _n state (continue:state -> bool) ldfs =
     List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs
 
  
-let check_all opt state (continue: state -> bool) (ldfs:L.ldfs) = 
+let check_all opt state (continue: t_continue) (ldfs:L.ldfs) = 
   let to_check = L.cnp_ldfs ldfs in
   Format.eprintf "%a tuples to check@." pp_z to_check;
   let tdone = ref Z.zero in
