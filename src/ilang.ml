@@ -625,7 +625,7 @@ module ToProg = struct
     | Oxor, _        -> assert false
     | Onot, [e1]     -> ksubst , P.Eop1(o_negb, e1)
     | Onot, _        -> assert false
-    | Oor, [e1; e2]  -> ksubst, P.Enot (P.Emul(P.Enot e1, P.Enot e2))
+    | Oor, [e1; e2]  -> ksubst, P.Eop1(o_negb, P.Eop2(o_mulb, P.Eop1(o_negb, e1), P.Eop1(o_negb, e2)))
     | Oor, _         -> assert false
     | Off _s,  es    -> kglitch, List.nth es 1 (* P.Eop(s, es) *)
     | Oid , [e]      -> ksubst , e

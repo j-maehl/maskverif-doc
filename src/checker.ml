@@ -135,17 +135,7 @@ let find_bij opt _n state maxparams ldfs =
           List.iter (fun e -> He.replace etbl e ()) es;
           etbl
         else 
-          if opt.checkbool && maxparams = 0 then
-            begin
-              Format.eprintf "Cannot check using gauzz, try to compute distr@.";
-              try 
-                Expr.check_bool opt (tuple (Array.of_list es));
-                let etbl = He.create 101 in
-                List.iter (fun e -> He.replace etbl e ()) es;
-                etbl
-              with Expr.CheckBool -> raise (CanNotCheck lhd) 
-            end
-          else raise (CanNotCheck lhd) in 
+          raise (CanNotCheck lhd) in 
     let is_in ei = He.mem etbl (ei.red_expr) in 
     List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
 
