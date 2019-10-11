@@ -51,12 +51,12 @@ typedef uint64_t sfc_t;
 /* -------------------------------------------------------------------- */
 static struct shrcnt *shrcnt_alloc(void) {
     struct shrcnt *the = NEW(struct shrcnt);
-    
+
     if (the != NULL) {
         memset(the, 0, sizeof(struct shrcnt));
         the->sc_fd = -1;
     }
-    
+
     return the;
 }
 
@@ -83,14 +83,14 @@ static void shrcnt_destroy(struct shrcnt *the) {
 static struct shrcnt *shrcnt_create(const char *nm, sfc_t flags) {
     struct shrcnt *the = shrcnt_alloc();
     int oflags = (flags & SFC_CREATE) ? O_CREAT : 0;
-    
+
     if (the == NULL)
         goto bailout;
 
     if ((the->sc_nm = strdup(nm)) == NULL)
         goto bailout;
     the->sc_flags = flags;
-    
+
     if ((flags & SFC_CREATE)) {
         (void) shm_unlink(nm);
         (void) sem_unlink(nm);
@@ -98,19 +98,19 @@ static struct shrcnt *shrcnt_create(const char *nm, sfc_t flags) {
 
     if ((the->sc_fd = shm_open(nm, oflags | O_RDWR, S_IRWUSR)) < 0)
         goto bailout;
-    
+
     if (ftruncate(the->sc_fd, sizeof(cnt_t)) < 0)
         goto bailout;
-    
+
     the->sc_mem = mmap(NULL, sizeof(cnt_t), PROT_RDWR, MAP_SHARED, the->sc_fd, 0);
     if (the->sc_mem == MAP_FAILED)
         goto bailout;
 
     if ((the->sc_sem = sem_open(nm, oflags, S_IRWUSR, 1)) == SEM_FAILED)
         goto bailout;
-    
+
     return the;
-    
+
 bailout:
     if (the != NULL)
         shrcnt_destroy(the);

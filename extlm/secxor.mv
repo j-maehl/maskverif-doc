@@ -1,0 +1,146 @@
+proc EORS:
+  inputs: a[0], b[0], lst[0:3]
+  outputs: c[0], lst'[0:3];
+
+(* initial leak state *)
+  lst' <- lst;
+
+(* generate leakage *)
+  leak eors_comp |= (a + b);
+  leak eors_lster |= (lst[0] + a, lst[1] + b);
+
+(* update leak state *)
+  lst'[0] <- a;
+  lst'[1] <- b;
+
+(* execute semantics *)
+  c <- a + b;
+end
+
+proc LDR:
+  inputs: a[0], lst[0:3]
+  outputs: o[0], lst'[0:3];
+
+(* initial leak state *)
+  lst' <- lst;
+
+(* generate leakage *)
+  leak load_t |= (lst[2], a[0]);
+  leak load_v |= (a[0]);
+
+(* update leakage state *)
+  lst'[2] <- a[0];
+
+(* execute semantics *)
+  o <- a[0];
+end
+
+proc STR:
+  inputs: v[0], lst[0:3]
+  outputs: o[0], lst'[0:3];
+
+(* initial leak state *)
+  lst' <- lst;
+
+(* generate leakage *)
+(*  leak store_t |= (lst[3], v[0]);
+  leak store_v |= (v[0]);
+*)
+(* update leakage state *)
+  lst'[3] <- v[0];
+
+(* execute semantics *)
+  o <- v[0];
+end
+
+proc CHECKUPDATES:
+  inputs: pub[0], r[0:7], sp[0], lr[0], pc[0], lst[0:3]
+  outputs: pub'[0];
+
+  (* leak any input combined with public *)
+  leak update_r0 |= (pub, r[0]);
+  leak update_r1 |= (pub, r[1]);
+  leak update_r2 |= (pub, r[2]);
+  leak update_r3 |= (pub, r[3]);
+  leak update_r4 |= (pub, r[4]);
+  leak update_r5 |= (pub, r[5]);
+  leak update_r6 |= (pub, r[6]);
+  leak update_r7 |= (pub, r[7]);
+
+  leak update_sp |= (pub, sp[0]);
+  leak update_lr |= (pub, lr[0]);
+  leak update_pc |= (pub, pc[0]);
+
+  leak update_lst0 |= (pub, lst[0]);
+  leak update_lst1 |= (pub, lst[1]);
+  leak update_lst2 |= (pub, lst[2]);
+  leak update_lst3 |= (pub, lst[3]);
+  (* TODO: make it a bit more realistic *)
+end
+
+proc secxor:
+  public inputs: r[0:7], sp, lr, pc, lst[0:3], pub
+  inputs: a[0:2], b[0:2]
+  outputs: c[0:2]
+  randoms: rnd[0];
+
+(*** FIRST INDEX ***)
+(*   0: 680b      	ldr	r3, [r1, #0]*)
+  (r3, lst) = LDR(a[0], lst);
+
+(*   2:	b510      	push	{r4, lr}*)
+  (* neglected *)
+
+(*   4:	6814      	ldr	r4, [r2, #0]*)
+  (r4, lst) = LDR(b[0], lst);
+
+(*   6:	4063      	eors	r3, r4*)
+  (r3, lst) = EORS(r3, r4, lst);
+
+(*   8:	6003      	str	r3, [r0, #0]*)
+  (c[0], lst) = STR(r3, lst);
+
+(* ADDED: clearing operand effect *)
+  (r3, lst) = EORS(r3, r3, lst);
+  (r3, lst) = EORS(r3, r5, lst);
+
+(*** SECOND INDEX ***)
+(*   c:	684b      	ldr	r3, [r1, #4]*)
+  (r4, lst) = LDR(a[1], lst);
+
+(*   a:	6854      	ldr	r4, [r2, #4]*)
+  (r3, lst) = LDR(b[1], lst);
+
+(*   e:	4063      	eors	r3, r4*)
+  (r3, lst) = EORS(r3, r4, lst);
+
+(*  10:	6043      	str	r3, [r0, #4]*)
+  (c[1], lst) = STR(r3, lst);
+
+(* ADDED: clearing operand effect *)
+  (r3, lst) = EORS(r3, r3, lst);
+  (r5, lst) = EORS(r5, r3, lst);
+
+
+(*** THIRD INDEX ***)
+(*  12:	688b      	ldr	r3, [r1, #8]*)
+  (r3, lst) = LDR(a[2], lst);
+
+(*  14:	6892      	ldr	r2, [r2, #8]*)
+  (r2, lst) = LDR(b[2], lst);
+
+(*  16:	4053      	eors	r3, r2*)
+  (r3, lst) = EORS(r3, r2, lst);
+
+(*  18:	6083      	str	r3, [r0, #8]*)
+  (c[2], lst) = STR(r3, lst);
+
+(*  1a:	bd10      	pop	{r4, pc}*)
+  (* neglected *)
+
+  (* any remaining values in registers can be overwritten by public values *)
+  dummy = CHECKUPDATES(pub, r, sp, lr, pc, lst);
+end
+
+print secxor
+para transition noglitch NI secxor

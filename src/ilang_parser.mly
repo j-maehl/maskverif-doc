@@ -83,17 +83,17 @@ connect_expr1:
 
 connect_exprn:
   | e=connect_expr1 { [e] }
-  | x=ident LBRACKET i=INT COLON j=INT RBRACKET 
+  | x=ident LBRACKET i=INT COLON j=INT RBRACKET
     { List.map (fun i -> Eid (x,Some i)) (mk_range_i i j) }
 
 connect_expr:
   | e=connect_expr1                        { Rexpr e }
-  | x=ident LBRACKET i=INT COLON j=INT RBRACKET 
+  | x=ident LBRACKET i=INT COLON j=INT RBRACKET
     { Rvect (List.map (fun i -> Eid (x,Some i)) (mk_range_i i j)) }
   | LCURLY es=list(connect_exprn) RCURLY   { Rvect (List.flatten es) }
 
 c_connect:
-  | CONNECT lhs=ident rhs=connect_expr1 { 
+  | CONNECT lhs=ident rhs=connect_expr1 {
      { c_connect_lhs = lhs; c_connect_rhs = rhs } }
 
 cell:
@@ -101,7 +101,7 @@ cell:
      { cell_name1 = i1; cell_name2 = i2; cell_connect = cs } }
 
 connect:
-  | CONNECT lhs=connect_expr; rhs=connect_expr { 
+  | CONNECT lhs=connect_expr; rhs=connect_expr {
      { connect_lhs = lhs; connect_rhs = rhs } }
 
 decl:
@@ -112,12 +112,11 @@ decl:
   | d=maskverif_decl               { Decl d }
 
 module1:
-  | MODULE x=ident ld=list(with_attribute(loc(decl))) END { 
+  | MODULE x=ident ld=list(with_attribute(loc(decl))) END {
     { mod_name = x; mod_decl = ld} }
 
 prog:
-  | AUTOIDX n=INT 
-    m=with_attribute(module1) EOF { 
+  | AUTOIDX n=INT
+    m=with_attribute(module1) EOF {
           { pautoidx = n; module_decl = m} }
   | error { parse_error (Location.make $startpos $endpos) None }
- 

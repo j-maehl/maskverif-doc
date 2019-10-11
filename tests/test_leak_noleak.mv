@@ -1,0 +1,20 @@
+proc test1:
+  public inputs: dmy
+  inputs: a[0:2]
+  outputs: c[0:2]
+  randoms: dummy[0:1];
+
+  r3 <- a[0];
+  leak asd |= (a[0]);
+  leak asd |= (a[0]);
+
+  c[0] <- a[0];
+  c[1] <- a[1];
+  c[2] <- a[2];
+
+end
+
+print test1
+
+para transition noglitch NI test1
+
