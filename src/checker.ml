@@ -1,5 +1,5 @@
 open Util
-open Expr 
+open Expr
 open State
 
 module C = Shrcnt
@@ -8,7 +8,7 @@ let cnp n p =
   let rec aux n p m d =
     if n = 1 then Z.div (Z.mul (Z.of_int p) m) d
     else aux (n-1) (p-1) (Z.mul (Z.of_int p) m) (Z.mul (Z.of_int n) d) in
-  if n = 0 then Z.one 
+  if n = 0 then Z.one
   else aux n p Z.one Z.one
 
 type expr_info = {
@@ -25,7 +25,7 @@ module L : sig
       cnp: Z.t;   (* cnp n p *)
       c : Z.t;    (* total number of tuple to check *)
     }
-           
+
   type ldfs = ldf list
 
   val cons : int -> expr_info list -> int -> ldfs -> ldfs
@@ -38,6 +38,8 @@ module L : sig
   val simplify_ldfs : t_continue -> state -> ldfs -> bool * ldfs
 
   val rev_append : ldfs -> ldfs -> ldfs
+
+  val init_classes : ldfs -> ldfs list 
 
 end = struct
   type ldf = {
@@ -53,28 +55,28 @@ end = struct
   let cnp_ldfs = function
     | []       -> Z.one
     | ldf :: _ -> ldf.c
-    
-  let cons n l p tl = 
+
+  let cons n l p tl =
     let cnp = cnp n p in
     assert (0 < n);
     { n; l; p; cnp; c = Z.mul cnp (cnp_ldfs tl)} ::  tl
 
-  let lfirst ldfs = 
-    let rec first n hd tl = 
-      if n = 0 then hd 
+  let lfirst ldfs =
+    let rec first n hd tl =
+      if n = 0 then hd
       else match tl with
            | x::tl -> first (n-1) (x::hd) tl
            | []   -> assert false in
-    let rec aux hd ldfs = 
+    let rec aux hd ldfs =
       match ldfs with
       | [] -> hd
       | { n = d; l = fs} ::ldfs -> aux (first d hd fs) ldfs in
     aux [] ldfs
 
-  let set_top_exprs state es = 
+  let set_top_exprs state es =
     List.iter (fun ei -> ignore (add_top_expr state ei.red_expr)) es
 
-  let set_top_exprs2 state ldfs = 
+  let set_top_exprs2 state ldfs =
     List.iter (fun ldf -> set_top_exprs state ldf.l) ldfs
 
   let simplify_ldfs (continue:t_continue) state ldfs = 
@@ -84,26 +86,104 @@ end = struct
     let res = simplify_until continue state in
     if res then (* No need to do more work just return *)
       false, ldfs
-    else 
+    else
       let simple = simplified_expr state in
-      true, List.map (fun ldf -> 
+      true, List.map (fun ldf ->
                 {ldf with l =  List.map (fun ei -> {ei with red_expr = simple ei.red_expr}) ldf.l }) ldfs
 
-  let rec rev_append l1 l2 = 
+  let rec rev_append l1 l2 =
     match l1 with
     | [] -> l2
     | ldf::l1 -> rev_append l1 ({ ldf with c = Z.mul ldf.cnp (cnp_ldfs l2) }::l2)
-  
+
+  module UF = UnionFind(He)
+
+  type union = UF.t
+  type classes = expr list
+
+  let uf = UF.init 100000 
+
+  let init_classes ldfs =
+
+    UF.clear uf;
+    UF.add uf etrue; 
+    let is_pub e =  UF.find uf e = UF.find uf etrue in
+
+    let all_pub = ref true in
+    let add_sub e e1 = 
+      if not (is_pub e1) then 
+        (all_pub := false; UF.union uf e1 e) in
+
+    let ptbl = Hv.create 11 in
+    let add_share p e = 
+      match Hv.find_opt ptbl p with
+      | Some e' -> UF.union uf e e'
+      | None    -> Hv.add ptbl p e in
+    
+    let rec add_expr e = 
+      if not (UF.mem uf e) then begin
+        UF.add uf e; 
+        match e.e_node with
+        | Etop -> assert false
+        | Ernd _ | Epriv _ -> () 
+        | Eshare (p,_,_) -> add_share p e 
+        | Epub _ | Econst _ -> UF.union uf etrue e
+        | Eop1(_, e1) ->
+          add_expr e1;
+          if is_pub e1 then UF.union uf etrue e
+          else UF.union uf e1 e
+        | Eop2(_,e1,e2) ->
+          add_expr e1; add_expr e2;
+          all_pub := true;
+          add_sub e e1; add_sub e e2;
+          if !all_pub then UF.union uf etrue e
+        | Eop(_,_,es) ->
+          Array.iter add_expr es;
+          all_pub := true;
+          Array.iter (add_sub e) es;
+          if !all_pub then UF.union uf etrue e
+        end in
+
+    let add_ei ei = add_expr ei.red_expr in
+    List.iter (fun ldf -> List.iter add_ei ldf.l) ldfs;
+    let cs = UF.classes uf in
+    
+    let get_class accu c = 
+      if c = UF.find uf etrue then accu 
+      else
+        let rec aux ldfs = 
+          match ldfs with
+          | [] -> []
+          | ldf :: ldfs ->
+            let ldfs = aux ldfs in
+            let l = 
+              List.filter (fun ei -> c = (UF.find uf ei.red_expr))
+                ldf.l in
+            let p = List.length l in
+            if p = 0 then ldfs 
+            else cons (min ldf.n p) l p ldfs in
+        let ldfs = aux ldfs in
+        if ldfs == [] then accu 
+        else ldfs::accu in
+
+    let l_ldfs = List.fold_left get_class [] cs in
+(*    let len = (List.length l_ldfs) in
+    if 1 < len then 
+      Format.eprintf "split %i %a@." len
+        (pp_list " " (fun fmt ldfs -> Z.pp_print fmt (List.hd ldfs).c))
+        l_ldfs; *)
+    l_ldfs
+                                                       
 end
 
-exception CanNotCheck of expr_info list 
-  
-let pp_eis fmt = 
-  pp_list "" (fun fmt ei -> ei.pp_info fmt ()) fmt 
+exception CanNotCheck of expr_info list
 
-let print_error opt fmt lhd = 
+let pp_eis fmt =
+  pp_list "" (fun fmt ei -> ei.pp_info fmt ()) fmt
+
+let print_error opt fmt lhd =
   Format.fprintf fmt "@[<v>Cannot check@ ";
-  if opt.pp_error then 
+  if opt.pp_error then
     Format.fprintf fmt "%a@ reduce to@ %a"
       pp_eis lhd
       (pp_list ",@ " (fun fmt ei -> pp_expr fmt ei.red_expr)) lhd;
@@ -112,6 +192,7 @@ let print_error opt fmt lhd =
 let find_bij opt _n state (continue:t_continue) ldfs =
   let lhd = L.lfirst ldfs in
   clear_state state;
+  
   L.set_top_exprs state lhd; 
   init_todo state;
   if not (simplify_until continue state) then 
@@ -121,11 +202,15 @@ let find_bij opt _n state (continue:t_continue) ldfs =
         (fun ldf -> List.map (fun ei -> ei.red_expr) ldf.L.l)
       ldfs
     in
-    Format.eprintf "."; Format.pp_print_flush Format.err_formatter (); 
+    Format.eprintf "Cannot check @[<v>%a@]@."
+      (pp_list "@ " Expr.pp_expr) es; 
+ (*   Format.eprintf "state = %a@." State.pp_state state; *)
+(*    Format.eprintf "."; Format.pp_print_flush Format.err_formatter (); *)
 
     let etbl = 
       try Pexpr.check_indep continue es other 
-      with Pexpr.Depend ->
+      with 
+      | Pexpr.Depend ->
         Format.eprintf "start poly@.";
         let ind = Poly_solve.check_indep continue es in
         Format.eprintf "end poly@.";
@@ -135,26 +220,17 @@ let find_bij opt _n state (continue:t_continue) ldfs =
           List.iter (fun e -> He.replace etbl e ()) es;
           etbl
         else 
-(*          if opt.checkbool && maxparams = 0 then
-            begin
-              Format.eprintf "Cannot check using gauzz, try to compute distr@.";
-              try 
-                Expr.check_bool opt (tuple (Array.of_list es));
-                let etbl = He.create 101 in
-                List.iter (fun e -> He.replace etbl e ()) es;
-                etbl
-              with Expr.CheckBool -> raise (CanNotCheck lhd) 
-            end
-          else *) raise (CanNotCheck lhd)  in 
+          raise (CanNotCheck lhd) 
+      | Pexpr.Out_of_scope ->
+        raise (CanNotCheck lhd) in 
     let is_in ei = He.mem etbl (ei.red_expr) in 
     List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs 
- 
- 
+
   else
     let used_share = used_share state in
     let bij = get_bij state in
     clear_state state;
-    L.set_top_exprs state lhd; 
+    L.set_top_exprs state lhd;
     L.set_top_exprs2 state ldfs;
     replay_bij state bij;
     init_todo state;
@@ -163,7 +239,6 @@ let find_bij opt _n state (continue:t_continue) ldfs =
       let res = is_top_expr state ei.red_expr in 
       res in
     List.map (fun ldf -> List.partition is_in ldf.L.l) ldfs
-
  
 let check_all opt state (continue: t_continue) (ldfs:L.ldfs) = 
   let to_check = L.cnp_ldfs ldfs in
@@ -178,43 +253,49 @@ let check_all opt state (continue: t_continue) (ldfs:L.ldfs) =
       Format.eprintf "%a tuples checked over %a in %.3f@."
         pp_z !tdone pp_z to_check (Sys.time () -. t0);
 
-
     let continue1, ldfs = L.simplify_ldfs continue state ldfs in
 
     if continue1 then 
-      let split = find_bij opt !tdone state continue ldfs in
-      let rec aux (accu:L.ldfs) split (ldfs:L.ldfs) = 
-        match split, ldfs with
-        | [], [] -> tdone := Z.add !tdone (L.cnp_ldfs accu)
-        | (s1, s2) :: split, ldf :: ldfs ->
-          let d = ldf.L.n in 
-          let len = ldf.L.p in 
-          let len1 = List.length s1 in
-          if not (d <= len1) then begin
-              Format.eprintf "d = %i@." d;
-              Format.eprintf "ldf = %a@."
-                (pp_list ";  " (fun fmt ei -> pp_expr fmt ei.red_expr)) ldf.L.l;
-              Format.eprintf "s1 = %a@."
-                (pp_list ";  " (fun fmt ei -> pp_expr fmt ei.red_expr)) s1;
-            assert false  
-          end;
-          let len2 = len - len1 in
-          aux (L.cons d s1 len1 accu) split ldfs;
-          let ldfs = L.rev_append accu ldfs in
-          if d <= len2 then 
-            check_all state continue (L.cons d s2 len2 ldfs);
-          for i1 = 1 to d - 1 do
-            let i2 = d - i1 in
-            if i1 <= len1 && i2 <= len2 then
-              check_all state continue (L.cons i1 s1 len1 (L.cons i2 s2 len2 ldfs))
-          done
-        | _ -> assert false in
-      aux [] split ldfs 
-    else 
+      let doit ldfs = 
+        let split = find_bij opt !tdone state continue ldfs in
+        let rec aux (accu:L.ldfs) split (ldfs:L.ldfs) = 
+          match split, ldfs with
+          | [], [] -> tdone := Z.add !tdone (L.cnp_ldfs accu)
+          | (s1, s2) :: split, ldf :: ldfs ->
+            let d = ldf.L.n in
+            let len = ldf.L.p in
+            let len1 = List.length s1 in
+            if not (d <= len1) then begin
+                Format.eprintf "d = %i@." d;
+                Format.eprintf "ldf = %a@."
+                  (pp_list ";  " (fun fmt ei -> pp_expr fmt ei.red_expr)) ldf.L.l;
+                Format.eprintf "s1 = %a@."
+                  (pp_list ";  " (fun fmt ei -> pp_expr fmt ei.red_expr)) s1;
+                assert false
+              end;
+            let len2 = len - len1 in
+            aux (L.cons d s1 len1 accu) split ldfs;
+            let ldfs = L.rev_append accu ldfs in
+            if d <= len2 then 
+              check_all state continue (L.cons d s2 len2 ldfs);
+            for i1 = 1 to d - 1 do
+              let i2 = d - i1 in
+              if i1 <= len1 && i2 <= len2 then
+                check_all state continue (L.cons i1 s1 len1 (L.cons i2 s2 len2 ldfs))
+            done
+          | _ -> assert false in
+        aux [] split ldfs in
+      let l_ldfs = L.init_classes ldfs in
+      List.iter doit l_ldfs
+    else
       tdone := Z.add !tdone (L.cnp_ldfs ldfs);
    in
   check_all state continue ldfs;
   Format.eprintf "%a tuples checked@." pp_z !tdone
+
+let check_all opt state continue (ldfs:L.ldfs) =
+  let l_ldfs = L.init_classes ldfs in
+  List.iter (check_all opt state continue) l_ldfs
 
 exception Done
 
@@ -235,7 +316,7 @@ let check_all_para opt state continue (ldfs:L.ldfs) =
 
   try
     let to_check = L.cnp_ldfs ldfs in
-  
+
     Format.eprintf "%a to check@." pp to_check;
 
     let pid = Unix.fork () in
@@ -254,13 +335,13 @@ let check_all_para opt state continue (ldfs:L.ldfs) =
         else 
           let nbdone = Shrcnt.get tdone in
           let to_check = Z.sub to_check (Z.of_int64 nbdone) in
-          let thld = Z.div to_check (Z.of_int 100) in
+          let thld = Z.div to_check (Z.of_int 400) in
           let thld_h = Z.div to_check (Z.of_int 2) in
 
           let goup, stend = ref false, ref false in
 
           if Z.gt (L.cnp_ldfs ldfs) thld && Z.lt (L.cnp_ldfs ldfs) thld_h then begin
-              if Shrcnt.get tprcs < 4L then begin
+              if Shrcnt.get tprcs < 8L then begin
                   let pid = Unix.fork () in
                   if pid = 0 then begin
                       if Unix.fork () = 0 then begin
@@ -276,29 +357,32 @@ let check_all_para opt state continue (ldfs:L.ldfs) =
             end;
 
           if not !goup then begin
-            let split = find_bij opt Z.zero state continue ldfs in
-            let rec aux accu split ldfs = 
-              match split, ldfs with
-              | [], [] ->
-                Shrcnt.update tdone (Z.to_int64 (L.cnp_ldfs accu))
-                              
-              | (s1, s2) :: split, ldf  :: ldfs ->
-                let d = ldf.L.n in 
-                let len = ldf.L.p in 
-                let len1 = List.length s1 in
-                let len2 = len - len1 in
-                aux (L.cons d s1 len1 accu) split ldfs;
-                let ldfs = L.rev_append accu ldfs in
-                if d <= len2 then 
-                  check_all state continue (L.cons d s2 len2 ldfs);
-                for i1 = 1 to d - 1 do
-                  let i2 = d - i1 in
-                  if i1 <= len1 && i2 <= len2 then
-                    check_all state continue (L.cons i1 s1 len1 (L.cons i2 s2 len2 ldfs))
-                done
+            let doit ldfs = 
+              let split = find_bij opt Z.zero state continue ldfs in
+              let rec aux accu split ldfs = 
+                match split, ldfs with
+                | [], [] ->
+                  Shrcnt.update tdone (Z.to_int64 (L.cnp_ldfs accu))
                   
-              | _ -> assert false in
-            aux [] split ldfs
+                | (s1, s2) :: split, ldf  :: ldfs ->
+                  let d = ldf.L.n in
+                  let len = ldf.L.p in
+                  let len1 = List.length s1 in
+                  let len2 = len - len1 in
+                  aux (L.cons d s1 len1 accu) split ldfs;
+                  let ldfs = L.rev_append accu ldfs in
+                  if d <= len2 then 
+                    check_all state continue (L.cons d s2 len2 ldfs);
+                  for i1 = 1 to d - 1 do
+                    let i2 = d - i1 in
+                    if i1 <= len1 && i2 <= len2 then
+                      check_all state continue (L.cons i1 s1 len1 (L.cons i2 s2 len2 ldfs))
+                  done
+                  
+                | _ -> assert false in
+              aux [] split ldfs in
+            let l_ldfs = L.init_classes ldfs in
+            List.iter doit l_ldfs
           end;
 
           if !stend then raise Done in
@@ -317,7 +401,7 @@ let check_all_para opt state continue (ldfs:L.ldfs) =
            Shrcnt.update tprcs (-1L);
            exit 0
          end
-      
+
     end else begin
       Unix.close (snd pipe);
       ignore (Unix.waitpid [] pid : int * _);
@@ -343,23 +427,27 @@ let check_all_para opt state continue (ldfs:L.ldfs) =
 
   with e -> (cleanup (); raise e)
 
-let pp_ok fmt (fname,s) = 
+let check_all_para opt state continue (ldfs:L.ldfs) =
+  let l_ldfs = L.init_classes ldfs in
+  List.iter (check_all_para opt state continue) l_ldfs
+
+let pp_ok fmt (fname,s) =
   match fname with
   | None -> Format.fprintf fmt "%s" s
   | Some x -> Format.fprintf fmt "%s is %s" x s
 
-let pp_fail opt fmt (fname,s,le) = 
+let pp_fail opt fmt (fname,s,le) =
   match fname with
-  | None -> 
-    Format.fprintf fmt "@[<v>Error not %s:@ %a@]" s (print_error opt) le 
-  | Some x -> 
+  | None ->
+    Format.fprintf fmt "@[<v>Error not %s:@ %a@]" s (print_error opt) le
+  | Some x ->
     Format.fprintf fmt "@[<v>Error %s is not %s:@ %a@]" x s (print_error opt) le
 
-let check_all_opt opt ~para = 
+let check_all_opt opt ~para =
   if para then check_all_para opt else check_all opt
 
 let check_ni opt ?(para=false) ?fname params nb_shares ~order all =
-  try 
+  try
     let len = List.length all in
     let state = init_state nb_shares params in
     let args = L.cons order all len [] in
@@ -368,8 +456,8 @@ let check_ni opt ?(para=false) ?fname params nb_shares ~order all =
   with CanNotCheck le ->
     Format.eprintf "%a@." (pp_fail opt) (fname,"NI",le)
 
-let check_threshold opt ?(para=false) ?fname order params all = 
-  try 
+let check_threshold opt ?(para=false) ?fname order params all =
+  try
     let state = init_state 1 params in
     let len = List.length all in
     let args = L.cons order all len [] in
@@ -379,11 +467,11 @@ let check_threshold opt ?(para=false) ?fname order params all =
     Format.eprintf "%a@." (pp_fail opt) (fname,"t-threshold secure",le)
 
 let check_fni opt ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ interns outs =
-  try 
+  try
     let len_i = List.length interns in
     let state = init_state nb_shares params in
     let mk_bound dft = function
-      | None -> dft 
+      | None -> dft
       | Some i -> i in
     let from = mk_bound 0 from in
     let to_ = mk_bound order to_ in
@@ -394,14 +482,14 @@ let check_fni opt ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ 
     (* First compute the number of tuples *)
     let total = ref Z.zero in
     let outs = List.map (fun l -> List.length l, l) outs in
-    let mk_out ko = 
+    let mk_out ko =
       List.fold_left (fun ldfs (len_o, out) ->
           let ko = if ko <= len_o then ko else len_o in
           L.cons ko out len_o ldfs) [] outs in
     for ki = from to to_ do
       let ko = order - ki in
       if ki <= len_i then
-         let args = if ko = 0 then [] else mk_out ko in 
+         let args = if ko = 0 then [] else mk_out ko in
          let args = if ki = 0 then args else L.cons ki interns len_i args in
          let to_check = L.cnp_ldfs args in
          total := Z.add !total to_check;
@@ -417,7 +505,7 @@ let check_fni opt ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ 
          check state (f ki ko) args);
       Format.eprintf "Checking of ki = %i, ko = %i done@." ki ko;
     done;
-    let pp_range fmt () = 
+    let pp_range fmt () =
       if from <> 0 || to_ <> order then
         Format.fprintf fmt " for range %i..%i" from to_ in
     Format.printf "%a%a@." pp_ok (fname,s) pp_range ()
@@ -432,22 +520,11 @@ let check_spini opt ?para ?fname =
   check_fni opt ?para "SPINI" ?fname 
     (fun ki _ko -> continue_spini ki)
 
+let check_rndo opt ?para ?fname params nb_shares ~order rndo = 
+  check_fni opt ?para ?fname "RNDO" (fun _ _ _ -> false) 
+      params nb_shares ~order [] rndo
+ 
 let check_fni opt ?para ?fname f = 
   check_fni opt ?para ?fname "FNI" 
     (fun ki ko -> continue_k (f ki ko))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

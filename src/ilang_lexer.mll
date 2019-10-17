@@ -1,4 +1,4 @@
-{ 
+{
   open Util
   open Ilang_parser
 
@@ -19,13 +19,13 @@
     "attribute" , ATTRIBUTE;
     "module"    , MODULE;
     "end"       , END;
-    "wire"      , WIRE; 
+    "wire"      , WIRE;
     "random"    , RANDOM;
     "public"    , PUBLIC;
     "input"     , INPUT;
     "output"    , OUTPUT;
     "width"     , WIDTH;
-    "upto"      , UPTO;  
+    "upto"      , UPTO;
     "cell"      , CELL;
     "connect"   , CONNECT;
     "parameter" , PARAMETER;
@@ -33,7 +33,7 @@
 
   let keywords =
     let table = Hashtbl.create 0 in
-    List.iter (fun (x,y) -> Hashtbl.add table x y) _keywords; 
+    List.iter (fun (x,y) -> Hashtbl.add table x y) _keywords;
     table
 
 }
@@ -49,20 +49,20 @@ let digit   = ['0'-'9']
 let uint    = digit+
 let other   = '.' | '[' | ']' | ':' | '$' | '\\' | '_' | '<' | '>'
 let ident_start = '$' | '\\'
-let ident = 
-  ident_start (letter | digit | other)*  
+let ident =
+  ident_start (letter | digit | other)*
 
-let keywords = letter+ 
+let keywords = letter+
 
 rule main = parse
   | newline     { Lexing.new_line lexbuf; main lexbuf }
   | blank+      { main lexbuf }
-  | keywords as id { try Hashtbl.find keywords id 
-                     with Not_found -> 
+  | keywords as id { try Hashtbl.find keywords id
+                     with Not_found ->
                        IDENT id }
   | ident as id  { IDENT id }
   | uint as n    { INT (int_of_string n) }
-  | "\""         { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) } 
+  | "\""         { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) }
   | "##"         { SHARPSHARP }
   | "#"          { comment lexbuf; main lexbuf }
 
@@ -92,4 +92,3 @@ and string buf = parse
                     Lexing.new_line lexbuf; string buf lexbuf }
   | eof           { unterminated_string () }
   | _ as c        { Buffer.add_char buf c   ; string buf lexbuf }
-

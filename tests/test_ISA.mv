@@ -1,0 +1,69 @@
+proc XOR:
+  inputs: a[0], b[0], op[0:1]
+  outputs: c[0], op'[0:1];
+
+(* generate leakage *)
+  leak xor_comp |= (a + b);
+  leak xor_oper |= (op[0] + a, op[1] + b);
+
+(* update leakage state *)
+  op'[0] <- a;
+  op'[1] <- b;
+
+(* execute semantics *)
+  c <- a + b;
+end
+
+print XOR
+
+
+proc LOAD1ST:
+  inputs: a[0], lst[0]
+  outputs: o[0], lst'[0];
+
+(* generate leakage *)
+  leak load_t |= (lst, a[0]);
+  leak load_v |= (a[0]);
+
+(* update leakage state *)
+  lst' <- a[0];
+
+(* execute semantics *)
+  o <- a[0];
+end
+
+print LOAD
+
+
+proc test1:
+  public inputs: op[0:1], lst[0]
+  inputs: a[0:2], b[0:2]
+  outputs: c[0:2]
+  randoms: rnd[0];
+
+  (r0,lst) = LOAD1ST(a[0], lst);
+  (r1,lst) = LOAD1ST(b[0], lst);
+  (r0,op)  = XOR(r0,r1,op);
+  c[0] <- r0;
+
+  (r0,op)  = XOR(r0,r0,op);
+  (r0,op)  = XOR(r0,rnd,op);
+
+  (r0,lst) = LOAD1ST(a[1], lst);
+  (r1,lst) = LOAD1ST(b[1], lst);
+  (r0,op)  = XOR(r0,r1,op);
+  c[1] <- r0;
+
+  (r0,op)  = XOR(r0,r0,op);
+  (r0,op)  = XOR(r0,rnd,op);
+
+  (r0,lst) = LOAD1ST(a[2], lst);
+  (r1,lst) = LOAD1ST(b[2], lst);
+  (r0,op)  = XOR(r0,r1,op);
+  c[2] <- r0;
+end
+
+print test1
+
+para transition noglitch NI test1
+

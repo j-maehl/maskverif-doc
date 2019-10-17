@@ -1,0 +1,159 @@
+op #gf256_mul : w8 -> w8 -> w8 
+end
+
+bij op #pow2 : w8 -> w8 
+end
+
+bij op #pow4 : w8 -> w8 
+end
+
+bij op #pow16 : w8 -> w8 
+end
+
+op #lsr : w8 -> w8 -> w8
+end
+
+op #lsl : w8 -> w8 -> w8
+end
+
+proc SHIFT1:
+  inputs: w8 a[0:3]
+  outputs: w8 b[0:3];
+
+  b0 := a3;
+  b[1:3] := a[0:2];
+end
+
+proc SHIFT2:
+  inputs: w8 a[0:3]
+  outputs: w8 b[0:3];
+
+  b[0:1] := a[2:3];
+  b[2:3] := a[0:1];
+end
+
+sni proc MUL:
+  inputs: w8 a[0:3], w8 b[0:3]
+  outputs: w8 c[0:3]
+  shares: w8 ab[0:3], w8 sb[0:3], w8 sa[0:3], w8 sr[0:3]
+  randoms: w8 r[0:3], w8 r';
+
+  ab = #gf256_mul(a, b);      
+  c   = ![ab ^w8 r]; 
+  sb  = SHIFT1(b);
+  ab := #gf256_mul(a, sb);
+  c   = ![c ^w8 ab];
+  sa  = SHIFT1(a);
+  ab := #gf256_mul(sa,b);
+  c   = ![c ^w8 ab];
+  sr  = SHIFT1(r);
+  c   = ![c ^w8 sr];
+  sb  = SHIFT2(b);
+  ab := #gf256_mul(a, sb);
+  c   = ![c ^w8 ab];
+  c   = ![c ^w8 [r',r',r',r']];
+end
+
+sni proc REFRESH:
+  inputs: w8 a[0:3]
+  outputs: w8 b[0:3]
+  shares: w8 r_[0:3]
+  randoms: w8 r[0:3];
+
+  r_ = SHIFT1(r);
+  r = ![r ^w8 r_];
+  b = ![r ^w8 a];
+end
+
+sni proc POW254:
+  inputs : w8 x[0:3]
+  outputs: w8 y[0:3]
+  shares : w8 w[0:3],z[0:3], w8 y_[0:3], w8 x_[0:3], w8 w_[0:3];
+
+  z = ![#pow2(x)];
+  x_ = REFRESH(x);
+  y = MUL(z,x_);
+  w = ![#pow4(y)];
+  w_ = REFRESH(w);
+  y_ = MUL(y,w_);
+  y = ![#pow16(y_)];
+  y_ = MUL(y,w);
+  y = MUL(y_,z); 
+end
+
+proc AFFINE:
+  inputs: w8 a[0:3]
+  outputs: w8 r[0:3]
+  shares: w8 t[0:3];
+
+  r := (0x00:w8);
+
+  t := #lsr(a,(0x0:w8));
+  t := t ^w8 #lsr(a, (0x4:w8));
+  t := t ^w8 #lsr(a, (0x5:w8));
+  t := t ^w8 #lsr(a, (0x6:w8));
+  t := t ^w8 #lsr(a, (0x7:w8));
+  t := t ^w8 (0x01:w8);
+  r := r ^w8 #lsl(t, (0x0:w8));
+
+  t := #lsr(a,(0x1:w8));
+  t := t ^w8 #lsr(a, (0x5:w8));
+  t := t ^w8 #lsr(a, (0x6:w8));
+  t := t ^w8 #lsr(a, (0x7:w8));
+  t := t ^w8 #lsr(a, (0x0:w8));
+  t := t ^w8 (0x01:w8);
+  r := r ^w8 #lsl(t, (0x1:w8));
+
+  t := #lsr(a,(0x2:w8));
+  t := t ^w8 #lsr(a, (0x6:w8));
+  t := t ^w8 #lsr(a, (0x7:w8));
+  t := t ^w8 #lsr(a, (0x0:w8));
+  t := t ^w8 #lsr(a, (0x1:w8));
+  t := t ^w8 (0x01:w8);
+  r := r ^w8 #lsl(t, (0x2:w8));
+
+  t := #lsr(a,(0x3:w8));
+  t := t ^w8 #lsr(a, (0x7:w8));
+  t := t ^w8 #lsr(a, (0x0:w8));
+  t := t ^w8 #lsr(a, (0x1:w8));
+  t := t ^w8 #lsr(a, (0x2:w8));
+  t := t ^w8 (0x01:w8);
+  r := r ^w8 #lsl(t, (0x3:w8));
+
+  t := #lsr(a,(0x4:w8));
+  t := t ^w8 #lsr(a, (0x0:w8));
+  t := t ^w8 #lsr(a, (0x1:w8));
+  t := t ^w8 #lsr(a, (0x2:w8));
+  t := t ^w8 #lsr(a, (0x3:w8));
+  t := t ^w8 (0x01:w8);
+  r := r ^w8 #lsl(t, (0x4:w8));
+
+  t := #lsr(a,(0x5:w8));
+  t := t ^w8 #lsr(a, (0x1:w8));
+  t := t ^w8 #lsr(a, (0x2:w8));
+  t := t ^w8 #lsr(a, (0x3:w8));
+  t := t ^w8 #lsr(a, (0x4:w8));
+  t := t ^w8 (0x01:w8);
+  r := r ^w8 #lsl(t, (0x5:w8));
+
+  t := #lsr(a,(0x6:w8));
+  t := t ^w8 #lsr(a, (0x2:w8));
+  t := t ^w8 #lsr(a, (0x3:w8));
+  t := t ^w8 #lsr(a, (0x4:w8));
+  t := t ^w8 #lsr(a, (0x5:w8));
+  t := t ^w8 (0x01:w8);
+  r := r ^w8 #lsl(t, (0x6:w8));
+
+  t := #lsr(a,(0x7:w8));
+  t := t ^w8 #lsr(a, (0x3:w8));
+  t := t ^w8 #lsr(a, (0x4:w8));
+  t := t ^w8 #lsr(a, (0x5:w8));
+  t := t ^w8 #lsr(a, (0x6:w8));
+  t := t ^w8 (0x01:w8);
+  r := r ^w8 #lsl(t, (0x7:w8));
+
+end  
+
+
+
+  
