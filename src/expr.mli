@@ -53,6 +53,7 @@ module Op : sig
   
 end
 
+val o_tuple  : operator
 val o_addb   : operator
 val o_addw8  : operator
 val o_addw16 : operator

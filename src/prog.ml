@@ -41,7 +41,7 @@ type fname = HS.t
 
 type macro_call = { i_lhs : vcalls; i_macro: fname; i_args : vcalls }
 
-type leak = {l_name : var; l_exprs : expr list}
+type leak = {l_name : var; l_exprs : expr}
 
 type instr_d =
   | Ileak of leak
@@ -130,13 +130,9 @@ let pp_call ?(full=dft_pinfo) fmt i =
   Format.fprintf fmt "@[<hov 2> %a =@ %a%a@]"
     (pp_vcalls ~full) i.i_lhs (HS.pp full.var_full) i.i_macro (pp_vcalls ~full) i.i_args
 
-let pp_exprs ?(full=dft_pinfo) fmt es =
-  Format.fprintf fmt "@[<hov>%a@]"
-    (pp_list ",@ " (pp_expr ~full)) es
-
 let pp_leak ?(full=dft_pinfo) fmt i =
-  Format.fprintf fmt "@[<hov 2> leak %a |=@ (%a)@]"
-    (pp_var ~full) i.l_name (pp_exprs ~full) i.l_exprs
+  Format.fprintf fmt "@[<hov 2> leak %a |=@ %a@]"
+    (pp_var ~full) i.l_name (pp_expr ~full) i.l_exprs
 
 let pp_instr_d ?(full=dft_pinfo) fmt = function
   | Iassgn i -> pp_assgn ~full fmt i
@@ -480,15 +476,16 @@ module ToProg = struct
     [mk_instr loc (Imacro { i_lhs; i_macro; i_args })]
 
   let get_lexprs env es =
-    List.map (to_expr env) es
+    let es = List.map (to_expr env) es in
+    Eop (E.o_tuple, es) 
 
   let to_leak env i =
     let loc = loc i in
     let (i,msg) = data i in
     let lname = get_var env i.P.l_name in
-    let les = get_lexprs env i.P.l_exprs in
+    let le = get_lexprs env i.P.l_exprs in
     set_init env lname;
-    [mk_instr loc ~msg (Ileak { l_name = lname; l_exprs = les })]
+    [mk_instr loc ~msg (Ileak { l_name = lname; l_exprs = le })]
 
   let to_instr env i =
     match (data i) with
@@ -579,9 +576,8 @@ module Process = struct
                  i_macro = i.i_macro;
                  i_args  = rename_vcalls i.i_args }
       | Ileak i ->
-        let rename_exprs = List.map (rename_e s) in
         Ileak { l_name = (*rename_var s *) i.l_name;
-                l_exprs = rename_exprs i.l_exprs
+                l_exprs = rename_e s i.l_exprs;
               } in
     { instr_d = d;
       instr_info = fun fmt () -> ppi fmt (); ii.instr_info fmt ();
@@ -638,7 +634,7 @@ module Process = struct
       let toleaks = leak_cross_input func i.i_args in
       let vleak = E.V.mk_var "leak" E.w1 in
       let mk_leak es = 
-        { instr_d = Ileak { l_name = vleak; l_exprs = es };
+        { instr_d = Ileak { l_name = vleak; l_exprs = Eop(E.o_tuple, es) };
           instr_info = fun fmt () -> Format.fprintf fmt "(* cross sni *)@ ";
                                      ppi fmt () } in
       let leaks = List.map mk_leak toleaks in
@@ -873,11 +869,8 @@ let rec build_obs ~trans ~glitch obs s c =
     in
     E.Hv.replace s i.i_var e;
     build_obs ~trans ~glitch obs s c
-  |  {instr_d = Ileak l; instr_info = pp } :: c ->
-    let e = List.map (subst_e s) l.l_exprs in
-    let ees = List.map (expr_of_pexpr) e in
-    let eea = Array.of_list ees in
-    let e = E.tuple eea in
+  | {instr_d = Ileak l; instr_info = pp } :: c ->
+    let e = expr_of_pexpr (subst_e s l.l_exprs) in
     add_observation obs e pp;
     build_obs ~trans ~glitch obs s c
 
