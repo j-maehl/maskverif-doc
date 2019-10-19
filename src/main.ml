@@ -143,15 +143,19 @@ let check_spini f b o =
 let pp_added func = 
   Format.printf "proc %s added@." func.Prog.f_name.hs_str
 
-let add_operator o ty bij = 
-  match List.rev ty with
-  | [] -> assert false
-  | ty::tys -> 
-    try ignore (Expr.Op.find (data o)); error "" (Some(loc o)) "duplicate operator %s" (data o)
-    with Not_found ->
-    let o = Expr.Op.make (data o) (Some(List.rev tys, ty)) bij Expr.Other in
+let add_operator o (dom, codom) bij = 
+  let bij_a = Array.of_list (List.map fst dom) in
+  let dom   = List.map snd dom in 
+  let bij   =
+    if Array.exists (fun b -> b) bij_a then Expr.PartialBij bij_a
+    else
+    if bij then Expr.Bij
+    else Expr.NotBij in
+  try ignore (Expr.Op.find (data o)); error "" (Some(loc o)) "duplicate operator %s" (data o)
+  with Not_found ->
+    let o = Expr.Op.make (data o) (Some(dom, codom)) bij Expr.Other in
     Format.printf "operator %s added@." o.Expr.op_name
-
+   
 let add_func f = 
   let func = Prog.Process.func globals f in
   pp_added func;
@@ -162,8 +166,8 @@ let add_func f =
     let order = mk_order None nb_shares in
     let o = { pp_error = true; checkbool = false; } in
     Checker.check_sni o 
-                ~para:false ~fname:(data f.f_name) ?from:None ?to_:None params nb_shares ~order interns outputs;
-    Checker.check_rndo o ~para:false ~fname:(data f.f_name) params
+                ~para:true ~fname:(data f.f_name) ?from:None ?to_:None params nb_shares ~order interns outputs;
+    Checker.check_rndo o ~para:true ~fname:(data f.f_name) params
       nb_shares ~order rndo
     
     

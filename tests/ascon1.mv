@@ -1,0 +1,207 @@
+op #ror : bij w64, w8 -> w64
+
+proc SHIFT1:
+  inputs: w8 a[0:3]
+  outputs: w8 b[0:3];
+
+  b0 := a3;
+  b[1:3] := a[0:2];
+end
+
+proc SHIFT2:
+  inputs: w8 a[0:3]
+  outputs: w8 b[0:3];
+
+  b[0:1] := a[2:3];
+  b[2:3] := a[0:1];
+end
+
+proc NOT:
+  inputs: w64 a[0:3]
+  outputs: w64 c[0:3];
+
+  c[0] := ~w64 a[0];
+  c[1:3] := a[1:3];
+end
+
+proc XOR_PUB:
+  public inputs: w64 c
+  inputs: w64 a[0:3]
+  outputs: w64 b[0:3];
+
+  b[0] := a[0] ^w64 c ;
+  b[1:3] := a[1:3];
+end
+
+sni proc AND:
+  inputs: w64 a[0:3], w64 b[0:3]
+  outputs: w64 c[0:3]
+  shares: w64 ab[0:3], w64 sb[0:3], w64 sa[0:3], w64 sr[0:3]
+  randoms: w64 r[0:3], w64 r';
+
+  ab = a &w64 b;      
+  c   = ![ab ^w64 r]; 
+  sb  = SHIFT1(b);
+  ab := a &w64 sb;
+  c   = ![c ^w64 ab];
+  sa  = SHIFT1(a);
+  ab := sa &w64 b;
+  c   = ![c ^w64 ab];
+  sr  = SHIFT1(r);
+  c   = ![c ^w64 sr];
+  sb  = SHIFT2(b);
+  ab := a &w64 sb;
+  c   = ![c ^w64 ab];
+  c   = ![c ^w64 [r',r',r',r']];
+end
+
+sni proc Sbox_V64:
+  inputs: w64 x_0_[0:3], w64 x_1_[0:3], w64 x_2_[0:3], w64 x_3_[0:3], w64 x_4_[0:3]
+  outputs: w64 xr_0_[0:3], w64 xr_1_[0:3], w64 xr_2_[0:3], w64 xr_3_[0:3], w64 xr_4_[0:3]
+  shares: w64 _shadow_t0_4_[0:3], w64 _shadow_t1_5_[0:3], w64 _shadow_t2_6_[0:3], w64 _shadow_t3_7_[0:3], w64 _shadow_t4_8_[0:3], w64 _shadow_x0_15_[0:3], w64 _shadow_x0_1_[0:3], w64 _shadow_x0_9_[0:3], w64 _shadow_x1_10_[0:3], w64 _shadow_x1_14_[0:3], w64 _shadow_x2_11_[0:3], w64 _shadow_x2_17_[0:3], w64 _shadow_x2_3_[0:3], w64 _shadow_x3_12_[0:3], w64 _shadow_x3_16_[0:3], w64 _shadow_x4_13_[0:3], w64 _shadow_x4_2_[0:3], w64 t0_[0:3], w64 t1_[0:3], w64 t2_[0:3], w64 t3_[0:3], w64 t4_[0:3];
+
+  _shadow_x0_1_ := x_0_ ^w64 x_4_;
+  _shadow_x4_2_ := x_4_ ^w64 x_3_;
+  _shadow_x2_3_ := x_2_ ^w64 x_1_;
+  t0_ = NOT(_shadow_x0_1_);
+  t1_ = NOT(x_1_);
+  t2_ = NOT(_shadow_x2_3_);
+  t3_ = NOT(x_3_);
+  t4_ = NOT(_shadow_x4_2_);
+  _shadow_t0_4_ = AND(t0_,x_1_);
+  _shadow_t1_5_ = AND(t1_, x_2_);   (* _shadow_t1_5_ = AND(t1_,_shadow_x2_3_); *)
+  _shadow_t2_6_ = AND(t2_,x_3_);
+  _shadow_t3_7_ = AND(t3_, x_4_);   (* AND(t3_,_shadow_x4_2_); *)
+  _shadow_t4_8_ = AND(t4_, x_0_);   (* AND(t4_,_shadow_x0_1_); *)
+  _shadow_x0_9_ := _shadow_x0_1_ ^w64 _shadow_t1_5_;
+  _shadow_x1_10_ := x_1_ ^w64 _shadow_t2_6_;
+  _shadow_x2_11_ := _shadow_x2_3_ ^w64 _shadow_t3_7_;
+  _shadow_x3_12_ := x_3_ ^w64 _shadow_t4_8_;
+  _shadow_x4_13_ := _shadow_x4_2_ ^w64 _shadow_t0_4_;
+  _shadow_x1_14_ := _shadow_x1_10_ ^w64 _shadow_x0_9_;
+  _shadow_x0_15_ := _shadow_x0_9_ ^w64 _shadow_x4_13_;
+  _shadow_x3_16_ := _shadow_x3_12_ ^w64 _shadow_x2_11_;
+  _shadow_x2_17_ = NOT(_shadow_x2_11_);
+  xr_0_ = ![ _shadow_x0_15_];
+  xr_1_ = ![_shadow_x1_14_];
+  xr_2_ = ![_shadow_x2_17_];
+  xr_3_ = ![_shadow_x3_16_];
+  xr_4_ = ![_shadow_x4_13_];
+
+end
+
+
+proc AddConstant_V64:
+  public inputs : w64 c_
+  inputs: w64 state_0_[0:3], w64 state_1_[0:3], w64 state_2_[0:3], w64 state_3_[0:3], w64 state_4_[0:3]
+  outputs: w64 stateR_0_[0:3], w64 stateR_1_[0:3], w64 stateR_2_[0:3], w64 stateR_3_[0:3], w64 stateR_4_[0:3]
+  shares: w64 _tmp1_[0:3];
+
+  _tmp1_ = XOR_PUB(c_, state_2_);
+  stateR_0_ := state_0_;
+  stateR_1_ := state_1_;
+  stateR_2_ := _tmp1_;
+  stateR_3_ := state_3_;
+  stateR_4_ := state_4_;
+
+end
+
+(* Comment assurer que si randoms en entr'ee alors randoms en sortie *)
+proc LinearLayer_V64:
+  inputs: w64 state_0_[0:3], w64 state_1_[0:3], w64 state_2_[0:3], w64 state_3_[0:3], w64 state_4_[0:3]
+  outputs: w64 stateR_0_[0:3], w64 stateR_1_[0:3], w64 stateR_2_[0:3], w64 stateR_3_[0:3], w64 stateR_4_[0:3]
+  shares: w64 _tmp10_[0:3], w64 _tmp11_[0:3], w64 _tmp12_[0:3], w64 _tmp13_[0:3], w64 _tmp14_[0:3], w64 _tmp15_[0:3], w64 _tmp16_[0:3], w64 _tmp2_[0:3], w64 _tmp3_[0:3], w64 _tmp4_[0:3], w64 _tmp5_[0:3], w64 _tmp6_[0:3], w64 _tmp7_[0:3], w64 _tmp8_[0:3], w64 _tmp9_[0:3];
+
+(*  _tmp2_ := #ror(state_0_, (0x13:w8));
+  _tmp3_ := state_0_ ^w64 _tmp2_;         
+  _tmp4_ := #ror(state_0_,(0x1C:w8));
+  stateR_0_ := _tmp3_ ^w64 _tmp4_;
+  _tmp5_ := #ror(state_1_,(0x3D:w8));
+  _tmp6_ := state_1_ ^w64 _tmp5_;
+  _tmp7_ := #ror(state_1_,(0x27:w8));
+  stateR_1_ := _tmp6_ ^w64 _tmp7_;
+  _tmp8_ := #ror(state_2_,(0x1:w8));
+  _tmp9_ := state_2_ ^w64 _tmp8_;
+  _tmp10_ := #ror(state_2_,(0x6:w8));
+  stateR_2_ := _tmp9_ ^w64 _tmp10_;
+  _tmp11_ := #ror(state_3_,(0xA:w8));
+  _tmp12_ := state_3_ ^w64 _tmp11_;
+  _tmp13_ := #ror(state_3_,(0x11:w8));
+  stateR_3_ := _tmp12_ ^w64 _tmp13_;
+  _tmp14_ := #ror(state_4_,(0x7:w8));
+  _tmp15_ := state_4_ ^w64 _tmp14_;
+  _tmp16_ := #ror(state_4_,(0x29:w8));
+  stateR_4_ := _tmp15_ ^w64 _tmp16_; 
+*)
+  stateR_0_ := state_0_;
+  stateR_1_ := state_1_;
+  stateR_2_ := state_2_;
+  stateR_3_ := state_3_;
+  stateR_4_ := state_4_;
+end
+
+proc ascon12_:
+  inputs: w64 input_0_[0:3], w64 input_1_[0:3], w64 input_2_[0:3], w64 input_3_[0:3], w64 input_4_[0:3]
+  outputs: w64 output_0_[0:3], w64 output_1_[0:3], w64 output_2_[0:3], w64 output_3_[0:3], w64 output_4_[0:3]
+  shares: w64 _tmp29_0_[0:3], w64 _tmp29_1_[0:3], w64 _tmp29_2_[0:3], w64 _tmp29_3_[0:3], w64 _tmp29_4_[0:3], w64 _tmp30_0_[0:3], w64 _tmp30_1_[0:3], w64 _tmp30_2_[0:3], w64 _tmp30_3_[0:3], w64 _tmp30_4_[0:3], w64 _tmp31_0_[0:3], w64 _tmp31_1_[0:3], w64 _tmp31_2_[0:3], w64 _tmp31_3_[0:3], w64 _tmp31_4_[0:3], w64 _tmp32_0_[0:3], w64 _tmp32_1_[0:3], w64 _tmp32_2_[0:3], w64 _tmp32_3_[0:3], w64 _tmp32_4_[0:3], w64 _tmp33_0_[0:3], w64 _tmp33_1_[0:3], w64 _tmp33_2_[0:3], w64 _tmp33_3_[0:3], w64 _tmp33_4_[0:3], w64 _tmp34_0_[0:3], w64 _tmp34_1_[0:3], w64 _tmp34_2_[0:3], w64 _tmp34_3_[0:3], w64 _tmp34_4_[0:3], w64 _tmp35_0_[0:3], w64 _tmp35_1_[0:3], w64 _tmp35_2_[0:3], w64 _tmp35_3_[0:3], w64 _tmp35_4_[0:3], w64 _tmp36_0_[0:3], w64 _tmp36_1_[0:3], w64 _tmp36_2_[0:3], w64 _tmp36_3_[0:3], w64 _tmp36_4_[0:3], w64 _tmp37_0_[0:3], w64 _tmp37_1_[0:3], w64 _tmp37_2_[0:3], w64 _tmp37_3_[0:3], w64 _tmp37_4_[0:3], w64 _tmp38_0_[0:3], w64 _tmp38_1_[0:3], w64 _tmp38_2_[0:3], w64 _tmp38_3_[0:3], w64 _tmp38_4_[0:3], w64 _tmp39_0_[0:3], w64 _tmp39_1_[0:3], w64 _tmp39_2_[0:3], w64 _tmp39_3_[0:3], w64 _tmp39_4_[0:3], w64 _tmp40_0_[0:3], w64 _tmp40_1_[0:3], w64 _tmp40_2_[0:3], w64 _tmp40_3_[0:3], w64 _tmp40_4_[0:3], w64 _tmp41_0_[0:3], w64 _tmp41_1_[0:3], w64 _tmp41_2_[0:3], w64 _tmp41_3_[0:3], w64 _tmp41_4_[0:3], w64 _tmp42_0_[0:3], w64 _tmp42_1_[0:3], w64 _tmp42_2_[0:3], w64 _tmp42_3_[0:3], w64 _tmp42_4_[0:3], w64 _tmp43_0_[0:3], w64 _tmp43_1_[0:3], w64 _tmp43_2_[0:3], w64 _tmp43_3_[0:3], w64 _tmp43_4_[0:3], w64 _tmp44_0_[0:3], w64 _tmp44_1_[0:3], w64 _tmp44_2_[0:3], w64 _tmp44_3_[0:3], w64 _tmp44_4_[0:3], w64 _tmp45_0_[0:3], w64 _tmp45_1_[0:3], w64 _tmp45_2_[0:3], w64 _tmp45_3_[0:3], w64 _tmp45_4_[0:3], w64 _tmp46_0_[0:3], w64 _tmp46_1_[0:3], w64 _tmp46_2_[0:3], w64 _tmp46_3_[0:3], w64 _tmp46_4_[0:3], w64 _tmp47_0_[0:3], w64 _tmp47_1_[0:3], w64 _tmp47_2_[0:3], w64 _tmp47_3_[0:3], w64 _tmp47_4_[0:3], w64 _tmp48_0_[0:3], w64 _tmp48_1_[0:3], w64 _tmp48_2_[0:3], w64 _tmp48_3_[0:3], w64 _tmp48_4_[0:3], w64 _tmp49_0_[0:3], w64 _tmp49_1_[0:3], w64 _tmp49_2_[0:3], w64 _tmp49_3_[0:3], w64 _tmp49_4_[0:3], w64 _tmp50_0_[0:3], w64 _tmp50_1_[0:3], w64 _tmp50_2_[0:3], w64 _tmp50_3_[0:3], w64 _tmp50_4_[0:3], w64 _tmp51_0_[0:3], w64 _tmp51_1_[0:3], w64 _tmp51_2_[0:3], w64 _tmp51_3_[0:3], w64 _tmp51_4_[0:3], w64 _tmp52_0_[0:3], w64 _tmp52_1_[0:3], w64 _tmp52_2_[0:3], w64 _tmp52_3_[0:3], w64 _tmp52_4_[0:3], w64 state_1_0_[0:3], w64 state_1_1_[0:3], w64 state_1_2_[0:3], w64 state_1_3_[0:3], w64 state_1_4_[0:3], w64 state_10_0_[0:3], w64 state_10_1_[0:3], w64 state_10_2_[0:3], w64 state_10_3_[0:3], w64 state_10_4_[0:3], w64 state_11_0_[0:3], w64 state_11_1_[0:3], w64 state_11_2_[0:3], w64 state_11_3_[0:3], w64 state_11_4_[0:3], w64 state_12_0_[0:3], w64 state_12_1_[0:3], w64 state_12_2_[0:3], w64 state_12_3_[0:3], w64 state_12_4_[0:3], w64 state_2_0_[0:3], w64 state_2_1_[0:3], w64 state_2_2_[0:3], w64 state_2_3_[0:3], w64 state_2_4_[0:3], w64 state_3_0_[0:3], w64 state_3_1_[0:3], w64 state_3_2_[0:3], w64 state_3_3_[0:3], w64 state_3_4_[0:3], w64 state_4_0_[0:3], w64 state_4_1_[0:3], w64 state_4_2_[0:3], w64 state_4_3_[0:3], w64 state_4_4_[0:3], w64 state_5_0_[0:3], w64 state_5_1_[0:3], w64 state_5_2_[0:3], w64 state_5_3_[0:3], w64 state_5_4_[0:3], w64 state_6_0_[0:3], w64 state_6_1_[0:3], w64 state_6_2_[0:3], w64 state_6_3_[0:3], w64 state_6_4_[0:3], w64 state_7_0_[0:3], w64 state_7_1_[0:3], w64 state_7_2_[0:3], w64 state_7_3_[0:3], w64 state_7_4_[0:3], w64 state_8_0_[0:3], w64 state_8_1_[0:3], w64 state_8_2_[0:3], w64 state_8_3_[0:3], w64 state_8_4_[0:3], w64 state_9_0_[0:3], w64 state_9_1_[0:3], w64 state_9_2_[0:3], w64 state_9_3_[0:3], w64 state_9_4_[0:3]  
+ others: w64 _tmp64_, w64 _tmp63_, w64 _tmp62_, w64 _tmp61_, w64 _tmp60_, w64 _tmp59_, w64 _tmp58_, w64 _tmp57_, w64 _tmp56_, w64 _tmp55_, w64 _tmp54_, w64 _tmp53_;
+
+  _tmp53_ := (0xF0:w64);
+  (_tmp29_0_,_tmp29_1_,_tmp29_2_,_tmp29_3_,_tmp29_4_) = AddConstant_V64(_tmp53_, input_0_,input_1_,input_2_,input_3_,input_4_);
+  (_tmp30_0_,_tmp30_1_,_tmp30_2_,_tmp30_3_,_tmp30_4_) = Sbox_V64(_tmp29_0_,_tmp29_1_,_tmp29_2_,_tmp29_3_,_tmp29_4_);
+  (state_1_0_,state_1_1_,state_1_2_,state_1_3_,state_1_4_) = LinearLayer_V64(_tmp30_0_,_tmp30_1_,_tmp30_2_,_tmp30_3_,_tmp30_4_);
+  _tmp54_ := (0xE1:w64);
+  (_tmp31_0_,_tmp31_1_,_tmp31_2_,_tmp31_3_,_tmp31_4_) = AddConstant_V64(_tmp54_, state_1_0_,state_1_1_,state_1_2_,state_1_3_,state_1_4_);
+  (_tmp32_0_,_tmp32_1_,_tmp32_2_,_tmp32_3_,_tmp32_4_) = Sbox_V64(_tmp31_0_,_tmp31_1_,_tmp31_2_,_tmp31_3_,_tmp31_4_);
+  (state_2_0_,state_2_1_,state_2_2_,state_2_3_,state_2_4_) = LinearLayer_V64(_tmp32_0_,_tmp32_1_,_tmp32_2_,_tmp32_3_,_tmp32_4_);
+  _tmp55_ := (0xD2:w64);
+  (_tmp33_0_,_tmp33_1_,_tmp33_2_,_tmp33_3_,_tmp33_4_) = AddConstant_V64(_tmp55_, state_2_0_,state_2_1_,state_2_2_,state_2_3_,state_2_4_);
+  (_tmp34_0_,_tmp34_1_,_tmp34_2_,_tmp34_3_,_tmp34_4_) = Sbox_V64(_tmp33_0_,_tmp33_1_,_tmp33_2_,_tmp33_3_,_tmp33_4_);
+  (state_3_0_,state_3_1_,state_3_2_,state_3_3_,state_3_4_) = LinearLayer_V64(_tmp34_0_,_tmp34_1_,_tmp34_2_,_tmp34_3_,_tmp34_4_);
+  _tmp56_ := (0xC3:w64);
+  (_tmp35_0_,_tmp35_1_,_tmp35_2_,_tmp35_3_,_tmp35_4_) = AddConstant_V64(_tmp56_, state_3_0_,state_3_1_,state_3_2_,state_3_3_,state_3_4_);
+  (_tmp36_0_,_tmp36_1_,_tmp36_2_,_tmp36_3_,_tmp36_4_) = Sbox_V64(_tmp35_0_,_tmp35_1_,_tmp35_2_,_tmp35_3_,_tmp35_4_);
+  (state_4_0_,state_4_1_,state_4_2_,state_4_3_,state_4_4_) = LinearLayer_V64(_tmp36_0_,_tmp36_1_,_tmp36_2_,_tmp36_3_,_tmp36_4_);
+  _tmp57_ := (0xB4:w64);
+  (_tmp37_0_,_tmp37_1_,_tmp37_2_,_tmp37_3_,_tmp37_4_) = AddConstant_V64(_tmp57_, state_4_0_,state_4_1_,state_4_2_,state_4_3_,state_4_4_);
+  (_tmp38_0_,_tmp38_1_,_tmp38_2_,_tmp38_3_,_tmp38_4_) = Sbox_V64(_tmp37_0_,_tmp37_1_,_tmp37_2_,_tmp37_3_,_tmp37_4_);
+  (state_5_0_,state_5_1_,state_5_2_,state_5_3_,state_5_4_) = LinearLayer_V64(_tmp38_0_,_tmp38_1_,_tmp38_2_,_tmp38_3_,_tmp38_4_);
+  _tmp58_ := (0xA5:w64);
+  (_tmp39_0_,_tmp39_1_,_tmp39_2_,_tmp39_3_,_tmp39_4_) = AddConstant_V64(_tmp58_, state_5_0_,state_5_1_,state_5_2_,state_5_3_,state_5_4_);
+  (_tmp40_0_,_tmp40_1_,_tmp40_2_,_tmp40_3_,_tmp40_4_) = Sbox_V64(_tmp39_0_,_tmp39_1_,_tmp39_2_,_tmp39_3_,_tmp39_4_);
+  (state_6_0_,state_6_1_,state_6_2_,state_6_3_,state_6_4_) = LinearLayer_V64(_tmp40_0_,_tmp40_1_,_tmp40_2_,_tmp40_3_,_tmp40_4_);
+  _tmp59_ := (0x96:w64);
+  (_tmp41_0_,_tmp41_1_,_tmp41_2_,_tmp41_3_,_tmp41_4_) = AddConstant_V64(_tmp59_, state_6_0_,state_6_1_,state_6_2_,state_6_3_,state_6_4_);
+  (_tmp42_0_,_tmp42_1_,_tmp42_2_,_tmp42_3_,_tmp42_4_) = Sbox_V64(_tmp41_0_,_tmp41_1_,_tmp41_2_,_tmp41_3_,_tmp41_4_);
+  (state_7_0_,state_7_1_,state_7_2_,state_7_3_,state_7_4_) = LinearLayer_V64(_tmp42_0_,_tmp42_1_,_tmp42_2_,_tmp42_3_,_tmp42_4_);
+  _tmp60_ := (0x87:w64);
+  (_tmp43_0_,_tmp43_1_,_tmp43_2_,_tmp43_3_,_tmp43_4_) = AddConstant_V64(_tmp60_, state_7_0_,state_7_1_,state_7_2_,state_7_3_,state_7_4_);
+  (_tmp44_0_,_tmp44_1_,_tmp44_2_,_tmp44_3_,_tmp44_4_) = Sbox_V64(_tmp43_0_,_tmp43_1_,_tmp43_2_,_tmp43_3_,_tmp43_4_);
+  (state_8_0_,state_8_1_,state_8_2_,state_8_3_,state_8_4_) = LinearLayer_V64(_tmp44_0_,_tmp44_1_,_tmp44_2_,_tmp44_3_,_tmp44_4_);
+  _tmp61_ := (0x78:w64);
+  (_tmp45_0_,_tmp45_1_,_tmp45_2_,_tmp45_3_,_tmp45_4_) = AddConstant_V64(_tmp61_,state_8_0_,state_8_1_,state_8_2_,state_8_3_,state_8_4_);
+  (_tmp46_0_,_tmp46_1_,_tmp46_2_,_tmp46_3_,_tmp46_4_) = Sbox_V64(_tmp45_0_,_tmp45_1_,_tmp45_2_,_tmp45_3_,_tmp45_4_);
+  (state_9_0_,state_9_1_,state_9_2_,state_9_3_,state_9_4_) = LinearLayer_V64(_tmp46_0_,_tmp46_1_,_tmp46_2_,_tmp46_3_,_tmp46_4_);
+  _tmp62_ := (0x69:w64);
+  (_tmp47_0_,_tmp47_1_,_tmp47_2_,_tmp47_3_,_tmp47_4_) = AddConstant_V64(_tmp62_,state_9_0_,state_9_1_,state_9_2_,state_9_3_,state_9_4_);
+  (_tmp48_0_,_tmp48_1_,_tmp48_2_,_tmp48_3_,_tmp48_4_) = Sbox_V64(_tmp47_0_,_tmp47_1_,_tmp47_2_,_tmp47_3_,_tmp47_4_);
+  (state_10_0_,state_10_1_,state_10_2_,state_10_3_,state_10_4_) = LinearLayer_V64(_tmp48_0_,_tmp48_1_,_tmp48_2_,_tmp48_3_,_tmp48_4_);
+  _tmp63_ := (0x5A:w64);
+  (_tmp49_0_,_tmp49_1_,_tmp49_2_,_tmp49_3_,_tmp49_4_) = AddConstant_V64(_tmp63_, state_10_0_,state_10_1_,state_10_2_,state_10_3_,state_10_4_);
+  (_tmp50_0_,_tmp50_1_,_tmp50_2_,_tmp50_3_,_tmp50_4_) = Sbox_V64(_tmp49_0_,_tmp49_1_,_tmp49_2_,_tmp49_3_,_tmp49_4_);
+  (state_11_0_,state_11_1_,state_11_2_,state_11_3_,state_11_4_) = LinearLayer_V64(_tmp50_0_,_tmp50_1_,_tmp50_2_,_tmp50_3_,_tmp50_4_);
+  _tmp64_ := (0x4B:w64);
+  (_tmp51_0_,_tmp51_1_,_tmp51_2_,_tmp51_3_,_tmp51_4_) = AddConstant_V64(_tmp64_, state_11_0_,state_11_1_,state_11_2_,state_11_3_,state_11_4_);
+  (_tmp52_0_,_tmp52_1_,_tmp52_2_,_tmp52_3_,_tmp52_4_) = Sbox_V64(_tmp51_0_,_tmp51_1_,_tmp51_2_,_tmp51_3_,_tmp51_4_);
+  (state_12_0_,state_12_1_,state_12_2_,state_12_3_,state_12_4_) = LinearLayer_V64(_tmp52_0_,_tmp52_1_,_tmp52_2_,_tmp52_3_,_tmp52_4_);
+  output_0_ = ![state_12_0_];
+  output_1_ = ![state_12_1_];
+  output_2_ = ![state_12_2_];
+  output_3_ = ![state_12_3_];
+  output_4_ = ![state_12_4_];
+
+end
+
+para SNI ascon12_
+
+

@@ -64,11 +64,16 @@ let pp_share fmt (p,s,v) =
 (* ----------------------------------------------------------------------- *)
 type op_kind = Add | Mul | Neg | Other
 
+type bij_kind = 
+  | Bij                         (* bijective on all arguments *)
+  | NotBij                      (* not bijective *)
+  | PartialBij of bool array    (* bijective on some arguments *)
+
 type operator = {
   op_id    : int;
   op_name  : string;
   op_ty    : (ty list * ty) option;
-  op_bij   : bool; (* true means  bijective *)
+  op_bij   : bij_kind; 
   op_kind  : op_kind
 }
 
@@ -80,6 +85,12 @@ module Op = struct
   let make s ty bij kind =
     if Hashtbl.mem tbl s then error "" None "duplicate operator %s" s;
     incr id;
+    let bij = 
+      match bij with
+      | PartialBij bs when Array.for_all (fun b -> b) bs -> Bij
+      | PartialBij bs when Array.for_all (fun b -> not b) bs -> NotBij
+      | _ -> bij in
+
     let o = {
         op_id = !id;
         op_name = s;
@@ -99,9 +110,9 @@ end
 
 (* ----------------------------------------------------------------------- *)
 
-let mk_add t s = Op.make s (Some ([t;t], t)) true  Add
-let mk_mul t s = Op.make s (Some ([t;t], t)) false Mul
-let mk_neg t s = Op.make s (Some ([t],t))    true  Neg 
+let mk_add t s = Op.make s (Some ([t;t], t)) Bij  Add
+let mk_mul t s = Op.make s (Some ([t;t], t)) NotBij Mul
+let mk_neg t s = Op.make s (Some ([t],t))    Bij  Neg 
 
 
 let o_addb   = mk_add w1  "^"
@@ -143,12 +154,12 @@ let o_mul = function
   | W32 -> o_mulw32
   | W64 -> o_mulw64
 
-let o_tuple = Op.make "" None false Other
+let o_tuple = Op.make "" None NotBij Other
 
-let _DFF_P_     = Op.make "$_DFF_P_" (Some([w1;w1],w1)) false Other
-let _DFF_PP0_   = Op.make "$_DFF_PP0_" (Some([w1;w1;w1],w1)) false Other
-let _DFFSR_PPP_ = Op.make "$_DFFSR_PPP_" (Some([w1;w1;w1],w1)) false Other
-let _DFF_PN0_   = Op.make "$_DFF_PN0_" (Some([w1;w1;w1;w1],w1)) false Other
+let _DFF_P_     = Op.make "$_DFF_P_" (Some([w1;w1],w1)) NotBij Other
+let _DFF_PP0_   = Op.make "$_DFF_PP0_" (Some([w1;w1;w1],w1)) NotBij Other
+let _DFFSR_PPP_ = Op.make "$_DFFSR_PPP_" (Some([w1;w1;w1],w1)) NotBij Other
+let _DFF_PN0_   = Op.make "$_DFF_PN0_" (Some([w1;w1;w1;w1],w1)) NotBij Other
 
 let is_FF_op o =
   Op.equal o _DFF_PP0_ || Op.equal o _DFFSR_PPP_ || Op.equal o _DFF_PN0_

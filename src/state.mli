@@ -74,3 +74,8 @@ val simplify_until_with_clear : t_continue -> state -> (param -> int -> bool) ->
 (* ----------------------------------------------------------------------- *)
 
 val is_top_expr : state -> expr -> bool
+
+(* ----------------------------------------------------------------------- *)
+val init_class : state -> expr -> unit
+val get_class : state -> expr -> int
+

@@ -31,17 +31,22 @@ type param = var
 
 type op_kind = Add | Mul | Neg | Other
 
+type bij_kind = 
+  | Bij                         (* bijective on all arguments *)
+  | NotBij                      (* not bijective *)
+  | PartialBij of bool array    (* bijective on some arguments *)
+
 type operator = private {
   op_id    : int;
   op_name  : string;
   op_ty    : (ty list * ty) option;
-  op_bij   : bool; (* true means  bijective *)
+  op_bij   : bij_kind; 
   op_kind  : op_kind
 }
 
 module Op : sig
           
-  val make : string -> (ty list * ty) option -> bool -> op_kind -> operator
+  val make : string -> (ty list * ty) option -> bij_kind -> op_kind -> operator
   val find : string -> operator
   val equal: operator -> operator -> bool
   val hash : operator -> int 

@@ -81,9 +81,11 @@ type checker_option =
 
 type checker_options = checker_option list
 
+type ty_op = (bool * Expr.ty)list * Expr.ty 
+
 type command =
   | Func       of func
-  | Operator   of ident * Expr.ty list * bool 
+  | Operator   of ident * ty_op * bool
   | NI         of ident * checker_options
   | SNI        of ident * (int * int) option * checker_options
   | SPINI      of ident * (int * int) option * checker_options

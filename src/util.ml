@@ -25,6 +25,23 @@ module List = struct
     | [] -> assert false
     | x::l -> let (l1,l2) = split (n-1) l in (x::l1, l2)
 
+  let rec smart_filter f l =
+    match l with
+    | [] -> l
+    | x :: l' -> 
+      if f x then
+        let nl' = smart_filter f l' in
+        if nl' == l' then l 
+        else x :: nl' 
+      else smart_filter f l'
+
+  let rec filter_map f g l = 
+    match l with
+    | [] -> []
+    | x :: l' -> 
+      if f x then g x :: filter_map f g l' 
+      else filter_map f g l'
+
 end
 
 let rec partition f lin lout l =
@@ -99,6 +116,13 @@ module Array = struct
     n1 = length t2 &&
       (n1 = 0 ||
          let rec aux i = f t1.(i) t2.(i) && (i = 0 || aux (i-1)) in
+         aux (n1 - 1))
+
+  let exists2 f t1 t2 =
+    let n1 = length t1 in
+    n1 = length t2 &&
+      (n1 = 0 ||
+         let rec aux i = f t1.(i) t2.(i) || (i <> 0 && aux (i-1)) in
          aux (n1 - 1))
 end
 

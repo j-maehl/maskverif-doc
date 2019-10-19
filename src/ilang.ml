@@ -150,12 +150,12 @@ module Process = struct
       "$_MUX_", { o_input = ["\\A";"\\B";"\\S"]; o_output = "\\Y";
                   o_desc = 
                     Oother (Op.make "$_MUX_" 
-                      (Some([w1;w1;w1],w1)) false Other)};
+                      (Some([w1;w1;w1],w1)) NotBij Other)};
       "$_DLATCH_P_", { o_input = ["\\D"; "\\E"]; o_output = "\\Q";
                        o_desc = 
                          Oother 
                            (Op.make "$_DLATCH_P_"
-                              (Some([w1;w1],w1)) false Other) };
+                              (Some([w1;w1],w1)) NotBij Other) };
       "$_DFF_P_",
         { o_input = ["\\C";"\\D";]; o_output = "\\Q";
           o_desc = Off _DFF_P_};

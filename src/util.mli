@@ -6,6 +6,8 @@ module List : sig
     val is_empty : 'a list -> bool
     val equal : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
     val split : int -> 'a list -> 'a list * 'a list
+    val smart_filter : ('a -> bool) -> 'a list -> 'a list 
+    val filter_map : ('a -> bool) -> ('a -> 'b) -> 'a list -> 'b list 
   end
 
 val partition :
@@ -40,6 +42,8 @@ module Array : sig
 
     val for_all : ('a -> bool) -> 'a array -> bool
     val for_all2 : ('a -> 'b -> bool) -> 'a array -> 'b array -> bool
+    val exists2 : ('a -> 'b -> bool) -> 'a array -> 'b array -> bool
+
   end
 
 (* ----------------------------------------------------------------------- *)
@@ -218,6 +222,7 @@ module UnionFind :
   functor (Ht:Hashtbl.S) -> UnionFind_S with type key = Ht.key
  *)
 
+(*
 module type UnionFind_S = sig
   type key 
 
@@ -235,4 +240,5 @@ end
 
 module UnionFind :
   functor (Ht:Hashtbl.S) -> UnionFind_S with type key = Ht.key
+ *)
 

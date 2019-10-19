@@ -778,7 +778,7 @@ let rec add_sub obs e pp =
     (* For bijective unarity operator not we do not add "op e", 
        since the adversary can directly observe e *)
     let e = E.op1 op e in
-    if not op.E.op_bij then add_observation obs e pp;
+    if not (op.E.op_bij = Bij) then add_observation obs e pp;
     e
   | Eop2(op,e1,e2) ->
     let e1 = add_sub obs e1 pp in
@@ -820,7 +820,7 @@ let add_glitch obs etrans e pp =
 
 let rec remove_top_not e =
   match e.E.e_node with
-  | E.Eop1(op, e) when op.E.op_bij -> remove_top_not e
+  | E.Eop1(op, e) when op.E.op_bij = Bij -> remove_top_not e
   | _      -> e
 
 let rec build_obs ~trans ~glitch obs s c =

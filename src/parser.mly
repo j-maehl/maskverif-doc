@@ -205,9 +205,13 @@ check_opt:
   | NOPRINT     { NoPrint }
   | TRANSITION  { Transition }
 
+bij_typ:
+  | bij=BIJ? ty=typ { bij <> None, ty } 
+ty_op:
+  | dom=separated_list(COMMA, bij_typ) ARROW codom=typ { dom, codom }
 
 command1:
-  | bij=BIJ? OPERATOR o=oident COLON ty=separated_nonempty_list(ARROW, typ) END { Operator(o,ty, bij <> None) }
+  | bij=BIJ? OPERATOR o=oident COLON ty=ty_op { Operator(o, ty, bij <> None) }
   | f=func                               { Func f }
   | o=check_opt* f=loc(NI)               { NI (f,o) }
   | o=check_opt* b=sni_bound? f=loc(SNI) { SNI (f,b,o) }
