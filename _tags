@@ -6,6 +6,7 @@ true : -traverse
 # --------------------------------------------------------------------
 <src>   : include
 <src/*> : package(zarith,unix,menhirLib,ocamlgraph)
+<src/maskverif.ml>: bin_annot, annot
 
 <src/main.byte>   : linkdep(src/shrcnt_low.o), custom
 <src/*.native>    : linkdep(src/shrcnt_low.o)

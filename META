@@ -1,0 +1,6 @@
+name="maskverif"
+description="Verification of masking countermeasures"
+version="0.1"
+requires=""
+archive(byte)="maskverif.cmo"
+archive(native)="maskverif.cmx"
