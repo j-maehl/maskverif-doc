@@ -165,8 +165,8 @@ let add_func f =
       Prog.build_obs_func ~trans:false ~glitch:true ~ni:`RSNI (loc f.f_name) func in
     let order = mk_order None nb_shares in
     let o = { pp_error = true; checkbool = false; } in
-    Checker.check_sni o 
-                ~para:true ~fname:(data f.f_name) ?from:None ?to_:None params nb_shares ~order interns outputs;
+(*    Checker.check_sni o 
+                ~para:true ~fname:(data f.f_name) ?from:None ?to_:None params nb_shares ~order interns outputs; *)
     Checker.check_rndo o ~para:true ~fname:(data f.f_name) params
       nb_shares ~order rndo
     

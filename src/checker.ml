@@ -149,6 +149,9 @@ let find_bij opt _n state (continue:t_continue) ldfs =
   L.set_top_exprs state lhd; 
   init_todo state;
   if not (simplify_until continue state) then 
+ (*   let simple = simplified_expr state in 
+    raise (CanNotCheck (List.map (fun ei -> {ei with red_expr = simple ei.red_expr}) lhd)) *)
+
     let es = List.map (fun ei -> ei.red_expr) lhd in
     let other = 
       List.map 

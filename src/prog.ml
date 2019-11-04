@@ -536,6 +536,12 @@ module ToProg = struct
     let f_ou = List.map snd f_ou in
     let _    = List.map (set_shared true env) func.P.f_shares in
     let f_pin = List.flatten (List.map (set_rand env) func.P.f_pin) in
+    let add_other env (id,ty) = 
+      let vx = E.V.mk_var (data id) ty in
+      add_var false env id (VKvar vx);
+      env.others <- vx::env.others 
+    in
+    let _     = List.iter (add_other env) func.P.f_other in
     let rnds = List.flatten (List.map (set_rand env) func.P.f_rand) in
     env, f_pin, f_in, f_ou, rnds
 

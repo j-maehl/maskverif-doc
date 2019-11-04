@@ -1,3 +1,70 @@
+bij op #pow2 : w8 -> w8
+
+proc REFRESH : 
+  inputs: w8 a[0:3]
+  outputs: w8 b[0:3]
+  randoms : w8 r0, w8 r1, w8 r2;
+
+  b[0] = ![ a[0] ^w8 r0 ];
+  b[1] = ![ a[1] ^w8 r1 ];
+  b[2] = ![ a[2] ^w8 r2 ];
+  b[3] = ![((a[3] ^w8 r0) ^w8 r1) ^w8 r2] ;
+end
+
+proc SHIFT1:
+  inputs: w8 a[0:3]
+  outputs: w8 b[0:3];
+
+  b0 := a3;
+  b[1:3] := a[0:2];
+end
+
+proc SHIFT2:
+  inputs: w8 a[0:3]
+  outputs: w8 b[0:3];
+
+  b[0:1] := a[2:3];
+  b[2:3] := a[0:1];
+end
+
+proc AND:
+  inputs: w8 a[0:3], w8 b[0:3]
+  outputs: w8 c[0:3]
+  shares: w8 ab[0:3], w8 sb[0:3], w8 sa[0:3], w8 sr[0:3]
+  randoms: w8 r[0:3], w8 r';
+
+  ab = a &w8 b;      
+  c   = ![ab ^w8 r]; 
+  sb  = SHIFT1(b);
+  ab := a &w8 sb;
+  c   = ![c ^w8 ab];
+  sa  = SHIFT1(a);
+  ab := sa &w8 b;
+  c   = ![c ^w8 ab];
+  sr  = SHIFT1(r);
+  c   = ![c ^w8 sr];
+  sb  = SHIFT2(b);
+  ab := a &w8 sb;
+  c   = ![c ^w8 ab];
+  c   = ![c ^w8 [r',r',r',r']]; 
+end
+
+proc pow3: 
+  inputs: w8 a[0:3]
+  outputs: w8 b[0:3]
+  shares : w8 c[0:3] ;
+
+  c = REFRESH(a);
+  c = ![#pow2(c)];
+  b = AND(a, c);
+end
+
+noglitch Probing pow3 
+
+
+
+
+(*
 op #ror : bij w64, w8 -> w64
 
 proc SHIFT1:
@@ -52,7 +119,7 @@ sni proc AND:
   sb  = SHIFT2(b);
   ab := a &w64 sb;
   c   = ![c ^w64 ab];
-  c   = ![c ^w64 [r',r',r',r']];
+(*  c   = ![c ^w64 [r',r',r',r']]; *)
 end
 
 sni proc Sbox_V64:
@@ -90,6 +157,7 @@ sni proc Sbox_V64:
 
 end
 
+para Probing Sbox_V64
 
 proc AddConstant_V64:
   public inputs : w64 c_
@@ -202,6 +270,7 @@ proc ascon12_:
 
 end
 
-para SNI ascon12_
 
 
+
+*)
