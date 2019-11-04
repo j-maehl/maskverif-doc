@@ -359,14 +359,16 @@ module ToProg = struct
         P.pp_ident id (pl1 + l1) l2;
 
     let pub, vcalls = List.split pl1 vcalls in
-    let get_pub v =
+    let get_pub v pv =
       let xs = get_vcall env v in
       let loc = P.vcall_loc v in
       match xs with
-      | [_] -> xs
+      | [x] -> 
+        check_ty_e loc (Evar x) pv.E.v_ty;
+        xs
       | _   -> error loc "shared variable not allowed here" in
 
-    let pub = List.map get_pub pub in
+    let pub = List.map2 get_pub pub pins in
 
     let get_vcall v (_,in_) =
       let xs = get_vcall env v in
@@ -378,6 +380,8 @@ module ToProg = struct
           "%a contains %i shares while %i is expected"
           P.pp_vcall v l1 l2;
       check_init env loc xs;
+      List.iter2 (fun x pv ->
+          check_ty_e loc (Evar x) pv.E.v_ty) xs in_;
       xs in
     let ins = List.map2 (get_vcall) vcalls ins in
     pub @ ins
@@ -400,6 +404,8 @@ module ToProg = struct
           "%a contains %i shares while %i is expected"
           P.pp_vcall v l1 l2;
       List.iter (set_init env) xs;
+      List.iter2 (fun x pv ->
+          check_ty_e loc (Evar x) pv.E.v_ty) xs out;
       xs in
     List.map2 (set_vcall) vcalls outs
 
@@ -437,12 +443,12 @@ module ToProg = struct
       instr_info = pp_loc_info loc msg;
     }
 
-
   let to_assgn env i =
     let loc = loc i in
     let i = data i in
     let xs = get_vcall env i.P.i_var in
     let mk_assgn x e =
+      check_ty_e loc e x.E.v_ty; 
       set_init env x;
       mk_instr loc (Iassgn { i_var  = x; i_kind = i.P.i_kind; i_expr = e }) in
     match xs with
