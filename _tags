@@ -2,13 +2,14 @@
 true : use_menhir, menhir_explain, menhir_table, thread
 true : warn_Z, warn_Y
 true : -traverse
-true : bin_annot
+true : bin_annot, annot
 
 # --------------------------------------------------------------------
 <src>   : include
 <src/*> : package(zarith,unix,menhirLib,ocamlgraph)
-<src/maskverif.ml>: bin_annot, annot
 
 <src/main.byte>   : linkdep(src/shrcnt_low.o), custom
 <src/*.native>    : linkdep(src/shrcnt_low.o)
 
+<**/*.cmx>         : for-pack(Maskverif)
+<**/maskverif.cmx> : -for-pack(Maskverif)

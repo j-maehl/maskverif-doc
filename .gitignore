@@ -1,6 +1,7 @@
 output/
 _build/
 main.native
+main.byte
 maskverif
 benchs/**/*.log
 

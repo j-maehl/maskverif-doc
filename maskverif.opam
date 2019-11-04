@@ -1,0 +1,17 @@
+opam-version: "2.0"
+name: "maskverif"
+version: "dev"
+maintainer: "Benjamin Gregoire"
+license: "CeCILL-B"
+bug-reports: "https://gitlab.com/benjgregoire/maskverif/issues"
+build: ["make" "native"]
+install: [
+  ["make" "install"]
+  ["cp" "main.native" "%{bin}%/maskverif"]
+]
+remove: [
+  ["ocamlfind" "remove" "maskverif"]
+  ["rm" "-f" "%{bin}%/maskverif"]
+  ]
+dev-repo: "git+https://gitlab.com/benjgregoire/maskverif.git"
+synopsis: "Maskverif is a tool to check the security of masked algorithms"

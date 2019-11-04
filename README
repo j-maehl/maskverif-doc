@@ -12,3 +12,15 @@ or by passing a .mv file
 
 A small tutorial is provide in tutorial.mv
 
+
+Alternatively, you can install maskverif as a library for ocamlfind via
+make install
+
+To make maskverif available as an opam executable in your path run
+opam pin add .
+opam install maskverif
+
+Run eval "$(opam env)", to update your path according
+
+To remove the executable, including libraries
+opam remove maskverif

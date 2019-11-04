@@ -36,14 +36,31 @@ test:	native
 %.inferred.mli:
 	@$(OCB) src/$@ && cat _build/src/$@
 
-install: maskverif.cma maskverif.cmxa maskverif.cmxs maskverif.cmx
+install: native byte maskverif.cmx maskverif.cmo maskverif.cma maskverif.cmxa maskverif.cmxs
 	-ocamlfind remove maskverif
-	ocamlfind install maskverif \
-		META _build/src/maskverif.cma \
-		_build/src/maskverif.cmxa _build/src/maskverif.cmxs \
-		_build/src/maskverif.cmx _build/src/maskverif.cmi \
-		_build/src/maskverif.a _build/src/maskverif.cmo \
-		_build/src/maskverif.cmt _build/src/maskverif.annot
+	ocamlfind install maskverif META \
+		_build/src/maskverif.{cmi,cmx,cma,cmo,cmt,cmxs,cmxa} \
+		_build/src/*.ml _build/src/*.mli
+	@if [[ ":${PATH}:" == *":${HOME}/.local/bin:"* ]]; then\
+	   mkdir -p "${HOME}/.local/bin/" && \
+	   cp $(MAIN).native "${HOME}/.local/bin/maskverif" && \
+	   echo "installed maskverif to '${HOME}/.local/bin/maskverif'"; \
+	elif [[ ":${PATH}:" == *":${HOME}/bin:"* ]]; then\
+	   mkdir -p "${HOME}/bin/" && \
+	   cp $(MAIN).native "${HOME}/bin/maskverif" && \
+	   echo "installed maskverif to '${HOME}/bin/maskverif'"; \
+	else\
+	  echo "Your path is missing ~/bin or ~/.local/bin, refusing to install executable.";\
+	fi
+
+uninstall:
+	-ocamlfind remove maskverif 2> /dev/null
+ifneq (,$(wildcard ${HOME}/.local/bin/maskverif))
+	rm "${HOME}/.local/bin/maskverif"
+endif
+ifneq (,$(wildcard ${HOME}/bin/maskverif))
+	rm "${HOME}/bin/maskverif"
+endif
 
 maskverif.%:
 	$(OCB) $(@)
