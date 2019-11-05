@@ -1,26 +1,28 @@
-To compile the tool, the best way is to use nix
-
-Start doing
-
+To compile maskverif, the best way is to use nix:
 > nix-shell
-> make 
+> make
 
-Then you can start using it iteractively by doing 
-./maskverif 
+Then you can start using it iteractively by doing
+> ./maskverif
 or by passing a .mv file
-./maskverif < tutorial.mv
+> ./maskverif < tutorial.mv
 
-A small tutorial is provide in tutorial.mv
+A small tutorial is provided in 'tutorial.mv'.
 
 
-Alternatively, you can install maskverif as a library for ocamlfind via
-make install
 
-To make maskverif available as an opam executable in your path run
-opam pin add .
-opam install maskverif
+To install maskverif as a library for ocamlfind without opam use:
+> make library
 
-Run eval "$(opam env)", to update your path according
+To install maskverif as executable in your path without opam use:
+> make install
 
-To remove the executable, including libraries
-opam remove maskverif
+To make maskverif available as an opam executable in your path run:
+> opam pin add .
+> opam install maskverif
+
+Remeber to run "eval $(opam env)", to update your path according.
+
+To remove the executable, including libraries run:
+> opam remove maskverif
+> make uninstall

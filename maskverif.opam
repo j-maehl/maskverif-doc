@@ -4,9 +4,9 @@ version: "dev"
 maintainer: "Benjamin Gregoire"
 license: "CeCILL-B"
 bug-reports: "https://gitlab.com/benjgregoire/maskverif/issues"
-build: ["make" "native"]
+build: [make "native"]
 install: [
-  ["make" "install"]
+  [make "library"]
   ["cp" "main.native" "%{bin}%/maskverif"]
 ]
 remove: [

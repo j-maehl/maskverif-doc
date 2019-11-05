@@ -11,9 +11,9 @@ endif
 OCB := ocamlbuild -use-ocamlfind $(OCB_FLAGS)
 
 # --------------------------------------------------------------------
-.PHONY: all clean byte native profile debug install
+.PHONY: all clean byte native profile debug test library install uninstall
 
-all: native
+all: native library install
 
 clean:
 	$(OCB) -clean; rm -f *~ src/*~ maskverif
@@ -36,11 +36,13 @@ test:	native
 %.inferred.mli:
 	@$(OCB) src/$@ && cat _build/src/$@
 
-install: native byte maskverif.cmx maskverif.cmo maskverif.cma maskverif.cmxa maskverif.cmxs
-	-ocamlfind remove maskverif
+library: native byte maskverif.cmx maskverif.cmo maskverif.cma maskverif.cmxa maskverif.cmxs
+	-ocamlfind remove maskverif 2> /dev/null
 	ocamlfind install maskverif META \
 		_build/src/maskverif.{cmi,cmx,cma,cmo,cmt,cmxs,cmxa} \
 		_build/src/*.ml _build/src/*.mli
+
+install: uninstall library
 	@if [[ ":${PATH}:" == *":${HOME}/.local/bin:"* ]]; then\
 	   mkdir -p "${HOME}/.local/bin/" && \
 	   cp $(MAIN).native "${HOME}/.local/bin/maskverif" && \
