@@ -1,6 +1,10 @@
 Checker
 Expr
 Parsetree
+Pexpr
+Poly
+Poly_solve
 Prog
+Shrcnt
 State
 Util

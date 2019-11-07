@@ -11,5 +11,5 @@ true : bin_annot, annot
 <src/main.byte>   : linkdep(src/shrcnt_low.o), custom
 <src/*.native>    : linkdep(src/shrcnt_low.o)
 
-<**/*.cmx>         : for-pack(Maskverif)
-<**/maskverif.cmx> : -for-pack(Maskverif)
+<**/*.cmx>       : for-pack(Maskverif)
+<**/maskverif.*> : -for-pack(Maskverif), custom

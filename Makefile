@@ -21,6 +21,7 @@ clean:
 native:
 	$(OCB) -tag debug $(MAIN).native
 	ln -sf $(MAIN).native maskverif
+
 byte:
 	$(OCB) $(MAIN).byte $(MAIN).byte
 
@@ -36,13 +37,16 @@ test:	native
 %.inferred.mli:
 	@$(OCB) src/$@ && cat _build/src/$@
 
-library: native byte maskverif.cmx maskverif.cmo maskverif.cma maskverif.cmxa maskverif.cmxs
+library: shrcntlow maskverif.cmx maskverif.cmo maskverif.cma maskverif.cmxa maskverif.cmxs
 	-ocamlfind remove maskverif 2> /dev/null
 	ocamlfind install maskverif META \
-		_build/src/maskverif.{cmi,cmx,cma,cmo,cmt,cmxs,cmxa} \
-		_build/src/*.ml _build/src/*.mli
+		_build/src/maskverif.{cmi,cmx,cma,cmo,cmxs,cmxa,a,o} \
+		src/*.{mli,ml,mll,mly,c,mllib,mlpack} \
+		_build/src/shrcnt_low.o \
+		_build/src/*.{cmt,cmti}
+	rm `ocamlfind query maskverif`/main.*
 
-install: uninstall library
+install: uninstall native library
 	@if [[ ":${PATH}:" == *":${HOME}/.local/bin:"* ]]; then\
 	   mkdir -p "${HOME}/.local/bin/" && \
 	   cp $(MAIN).native "${HOME}/.local/bin/maskverif" && \
@@ -64,5 +68,8 @@ ifneq (,$(wildcard ${HOME}/bin/maskverif))
 	rm "${HOME}/bin/maskverif"
 endif
 
-maskverif.%:
-	$(OCB) $(@)
+maskverif.%: shrcntlow
+	$(OCB) shrcnt_low.o -cflags -cclib,-lshrcnt_low $(@)
+
+shrcntlow:
+	$(OCB) src/shrcnt_low.o
