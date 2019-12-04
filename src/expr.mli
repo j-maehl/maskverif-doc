@@ -6,6 +6,7 @@ val w16   : ty
 val w32   : ty
 val w64   : ty
 
+val ty_size : ty -> int
 val ty2string : ty -> string 
 
 type var = private {

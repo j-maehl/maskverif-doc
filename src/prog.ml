@@ -131,7 +131,7 @@ let pp_call ?(full=dft_pinfo) fmt i =
     (pp_vcalls ~full) i.i_lhs (HS.pp full.var_full) i.i_macro (pp_vcalls ~full) i.i_args
 
 let pp_leak ?(full=dft_pinfo) fmt i =
-  Format.fprintf fmt "@[<hov 2> leak %a |=@ %a@]"
+  Format.fprintf fmt "@[<hov 2> leak %a@ %a@]"
     (pp_var ~full) i.l_name (pp_expr ~full) i.l_exprs
 
 let pp_instr_d ?(full=dft_pinfo) fmt = function
