@@ -6,6 +6,7 @@ UNAME_S   := $(shell uname -s)
 
 ifeq ($(UNAME_S),Linux)
 OCB_FLAGS += -lflags -cclib,-lrt
+SHELL     := /bin/bash
 endif
 
 OCB := ocamlbuild -use-ocamlfind $(OCB_FLAGS)
