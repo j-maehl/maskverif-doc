@@ -164,7 +164,9 @@ let find_bij opt _n state (continue:t_continue) ldfs =
 (*    Format.eprintf "."; Format.pp_print_flush Format.err_formatter (); *)
 
     let etbl = 
-      try Pexpr.check_indep continue es other 
+      try let res = Pexpr.check_indep continue es other in
+          Format.eprintf "Checked using Pexpr@.";
+          res
       with 
       | Pexpr.Depend ->
         Format.eprintf "start poly@.";
@@ -173,6 +175,7 @@ let find_bij opt _n state (continue:t_continue) ldfs =
 
         if ind then
           let etbl = He.create 101 in
+          Format.eprintf "Checked using Poly_solve@.";
           List.iter (fun e -> He.replace etbl e ()) es;
           etbl
         else 
@@ -403,27 +406,31 @@ let pp_fail opt fmt (fname,s,le) =
 let check_all_opt opt ~para =
   if para then check_all_para opt else check_all opt
 
-let check_ni opt ?(para=false) ?fname params nb_shares ~order all =
+let init_outpub = function
+  | None -> []
+  | Some ei -> L.cons 1 [ei] 1 [] 
+
+let check_ni opt ?(para=false) ?fname params nb_shares ~order ?outpub all =
   try
     let len = List.length all in
     let state = init_state nb_shares params in
-    let args = L.cons order all len [] in
+    let args = L.cons order all len (init_outpub outpub) in 
     check_all_opt opt ~para state (continue_k order) args;
     Format.printf "%a@." pp_ok (fname,"NI at order "^string_of_int order)
   with CanNotCheck le ->
     Format.eprintf "%a@." (pp_fail opt) (fname,"NI",le)
 
-let check_threshold opt ?(para=false) ?fname order params all =
+let check_threshold opt ?(para=false) ?fname order params ?outpub all =
   try
     let state = init_state 1 params in
     let len = List.length all in
-    let args = L.cons order all len [] in
+    let args = L.cons order all len  (init_outpub outpub) in
     check_all_opt opt ~para state (continue_k 0) args;
     Format.printf "%a@." pp_ok (fname,"t-threshold secure")
   with CanNotCheck le ->
     Format.eprintf "%a@." (pp_fail opt) (fname,"t-threshold secure",le)
 
-let check_fni opt ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ interns outs =
+let check_fni opt ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ interns ?outpub outs =
   try
     let len_i = List.length interns in
     let state = init_state nb_shares params in
@@ -439,14 +446,15 @@ let check_fni opt ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ 
     (* First compute the number of tuples *)
     let total = ref Z.zero in
     let outs = List.map (fun l -> List.length l, l) outs in
+    let outpub = init_outpub outpub in
     let mk_out ko =
       List.fold_left (fun ldfs (len_o, out) ->
           let ko = if ko <= len_o then ko else len_o in
-          L.cons ko out len_o ldfs) [] outs in
+          L.cons ko out len_o ldfs) outpub outs in
     for ki = from to to_ do
       let ko = order - ki in
       if ki <= len_i then
-         let args = if ko = 0 then [] else mk_out ko in
+         let args = if ko = 0 then outpub else mk_out ko in
          let args = if ki = 0 then args else L.cons ki interns len_i args in
          let to_check = L.cnp_ldfs args in
          total := Z.add !total to_check;
@@ -457,7 +465,7 @@ let check_fni opt ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ 
       let ko = order - ki in
       Format.eprintf "Start checking of ki = %i, ko = %i@." ki ko;
       (if ki <= len_i then
-         let args = if ko = 0 then [] else mk_out ko in
+         let args = if ko = 0 then outpub else mk_out ko in
          let args = if ki = 0 then args else L.cons ki interns len_i args in
          check state (f ki ko) args);
       Format.eprintf "Checking of ki = %i, ko = %i done@." ki ko;
