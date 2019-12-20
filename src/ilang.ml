@@ -655,13 +655,13 @@ module ToProg = struct
     let f_name  = HS.make modul.ilm_name in
     let f_pin   = mk_vars envm modul.ilm_inppub in
     let f_in    = mk_in envm modul.ilm_inputs in
-    let _f_pout = mk_vars envm modul.ilm_outpub in
+    let f_pout = mk_vars envm modul.ilm_outpub in
     let f_out   = List.map (mk_vars envm) modul.ilm_outputs in
     let f_other = mk_vars envm modul.ilm_others  in
     let f_rand  = mk_vars envm modul.ilm_randoms in
     let f_cmd   = List.map (mk_instr envm) modul.ilm_cmd in
     (* FIXME add public output *)
-    P.{ f_name; f_pin; f_in; f_out; f_other; f_rand; f_cmd; f_ein = []; f_kind = NONE }
+    P.{ f_name; f_pin; f_in; f_out; f_pout; f_other; f_rand; f_cmd; f_ein = []; f_kind = NONE }
 
 
 end

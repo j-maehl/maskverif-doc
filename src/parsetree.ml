@@ -69,7 +69,9 @@ type func = {
   f_rand   : (ident * range option * Expr.ty) list;
   f_other  : (ident * Expr.ty) list;
   f_kind   : proc_kind;
-  f_cmd    : cmd }
+  f_cmd    : cmd;
+  f_pout   : vcall1 list;
+ }
 
 type checker_option =
   | Order of int
@@ -245,6 +247,9 @@ let pp_prog fmt prog =
  *)
 
 (* --------------------------------------------------------------------- *)
-let vcall_loc = function
-  | (Vid (id,_),_) -> loc id
-  | (Vtuple ids,_) -> loc ids
+let vcall1_loc = function
+  | Vid (id,_) -> loc id
+  | Vtuple ids -> loc ids
+
+let vcall_loc v = vcall1_loc (fst v)
+

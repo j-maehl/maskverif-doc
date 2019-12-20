@@ -167,6 +167,10 @@ pub_inputs:
   |                                                     { [] }
   | PUBLIC INPUTS COLON d=separated_list(COMMA,id_range_decl) { d }
 
+pub_outputs:
+  |                                                     { [] }
+  | PUBLIC OUTPUTS COLON d=separated_list(COMMA,  vcall1) { d }
+
 randoms:
   |                                                     { [] }
   | RANDOMS COLON r=separated_list(COMMA,id_range_decl) { r }
@@ -186,12 +190,13 @@ func:
       f_shares = shares_decl
       f_rand   = randoms
       f_other  = other_vars
+      f_pout   = pub_outputs 
       SEMICOLON
       f_cmd    = cmd
     END
     { 
       let f_kind = match k with None -> NONE | Some _ -> SNI in
-      { f_name; f_pin; f_in; f_out; f_shares; f_rand; f_other; f_cmd; f_kind } }
+      { f_name; f_pin; f_in; f_out; f_pout; f_shares; f_rand; f_other; f_cmd; f_kind } }
 
 sni_bound:
   | to_=INT          { 0,to_ }

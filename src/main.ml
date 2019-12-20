@@ -99,11 +99,11 @@ let pp_option fmt o =
 let check_ni f o =
   let func = Prog.get_global globals f in
   Format.printf "Checking NI for %s: %a@." (data f) pp_option o;
-  let (params, nb_shares, all, _, _) =
+  let (params, nb_shares, all, _, outpub, _) =
     Prog.build_obs_func ~trans:o.trans ~glitch:o.glitch ~ni:`NI (loc f) func in
 (*  Format.printf "@[<v>observations:@ %a@]@." Checker.pp_eis all; *)
   let order = mk_order o.order nb_shares in
-  Checker.check_ni ~para:o.para ~fname:(data f) o.option params ~order nb_shares all
+  Checker.check_ni ~para:o.para ~fname:(data f) o.option params ~order nb_shares ~outpub all
 
 let check_threshold f o =
   let func = Prog.get_global globals f in
@@ -114,31 +114,31 @@ let check_threshold f o =
   Format.printf "Checking Threshold for %s: %a@." (data f) pp_option o;
   let func = Prog.threshold func in
 (*  Format.printf "%a@." (Prog.pp_func ~full:Prog.var_pinfo) func; *)
-  let (params, _, all, _, _) =
+  let (params, _, all, _, outpub, _) =
     Prog.build_obs_func ~trans:o.trans ~glitch:o.glitch ~ni:`Threshold (loc f) func in
   let order = mk_order o.order nb_shares in
  (* Format.printf "@[<v>observations:@ %a@]@." Checker.pp_eis all; *)
-  Checker.check_threshold o.option ~para:o.para order params all
+  Checker.check_threshold o.option ~para:o.para order params ~outpub all
 
 let check_sni f b o =
   let from, to_ =
     match b with None -> None, None | Some (i,j) -> Some i, Some j in
   let func = Prog.get_global globals f in
   Format.printf "Checking SNI for %s: %a@." (data f) pp_option o;
-  let (params, nb_shares, interns, outputs, _) =
+  let (params, nb_shares, interns, outputs, outpub, _) =
     Prog.build_obs_func ~trans:o.trans ~glitch:o.glitch ~ni:`SNI (loc f) func in
   let order = mk_order o.order nb_shares in
-  Checker.check_sni o.option ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares ~order interns outputs 
+  Checker.check_sni o.option ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares ~order interns ~outpub outputs 
  
 let check_spini f b o =
   let from, to_ = 
     match b with None -> None, None | Some (i,j) -> Some i, Some j in
   let func = Prog.get_global globals f in
   Format.printf "Checking SPINI for %s: %a@." (data f) pp_option o;
-  let (params, nb_shares, interns, outputs, _) = 
+  let (params, nb_shares, interns, outputs, outpub, _) = 
     Prog.build_obs_func ~trans:o.trans ~glitch:o.glitch ~ni:`SNI (loc f) func in
   let order = mk_order o.order nb_shares in
-  Checker.check_spini o.option ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares ~order interns outputs 
+  Checker.check_spini o.option ~para:o.para ~fname:(data f) ?from ?to_ params nb_shares ~order ~outpub interns outputs 
 
 let pp_added func = 
   Format.printf "proc %s added@." func.Prog.f_name.hs_str
@@ -160,13 +160,13 @@ let add_func f =
   let func = Prog.Process.func globals f in
   pp_added func;
   if func.f_kind = Util.SNI then
-    let (params, nb_shares, interns, outputs, rndo) =
+    let (params, nb_shares, interns, outputs, outpub, rndo) =
       (* FIXME trans and glitch *)
       Prog.build_obs_func ~trans:false ~glitch:true ~ni:`RSNI (loc f.f_name) func in
     let order = mk_order None nb_shares in
     let o = { pp_error = true; checkbool = false; } in
-(*    Checker.check_sni o 
-                ~para:true ~fname:(data f.f_name) ?from:None ?to_:None params nb_shares ~order interns outputs; *)
+    ignore(Checker.check_sni o 
+                ~para:true ~fname:(data f.f_name) ?from:None ?to_:None params nb_shares ~order interns ~outpub outputs); 
     ignore (Checker.check_rndo o ~para:true ~fname:(data f.f_name) params
       nb_shares ~order rndo)
     

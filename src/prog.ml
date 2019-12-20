@@ -62,6 +62,7 @@ type func = {
   f_ein    : var list;     (* extra input perfectly shared *)
   f_kind   : proc_kind;
   f_out    : var list list;
+  f_pout   : var list;
   f_other  : var list;
   f_rand   : var list;
   f_cmd    : cmd }
@@ -551,12 +552,19 @@ module ToProg = struct
     let rnds = List.flatten (List.map (set_rand env) func.P.f_rand) in
     env, f_pin, f_in, f_ou, rnds
 
+  let to_pout env v = 
+    let xs = get_vcall1 env v in
+    let loc = P.vcall1_loc v in
+    check_init env loc xs;
+    xs
+    
   let to_func globals func =
     let f_name = HS.make (data func.P.f_name) in
     let env, f_pin, f_in, f_out, f_rand = init_shared globals func in
     let f_cmd = List.flatten (List.map (to_instr env) func.P.f_cmd) in
     let f_other = env.others in
-    { f_name; f_pin; f_ein = []; f_kind = func.P.f_kind; f_in; f_out; f_other; f_rand; f_cmd }
+    let f_pout = List.flatten (List.map (to_pout env) func.P.f_pout) in
+    { f_name; f_pin; f_ein = []; f_kind = func.P.f_kind; f_in; f_out; f_pout; f_other; f_rand; f_cmd; }
 
 end
 (* ------------------------------------------------------------------ *)
@@ -900,13 +908,41 @@ let sub_array es1 es2 =
         else aux i1 (i2+1) in
     aux 0 0
 
-let remove_subtuple pin obs =
+let rec clear_pub pub es = 
+  match es with
+  | [] -> []
+  | e::es -> 
+    match clear_pub_e pub e with
+    | None -> clear_pub pub es 
+    | Some e -> e::clear_pub pub es 
+and clear_pub_e pub e =
+  if E.Se.mem e pub then None 
+  else
+    match e.E.e_node with
+    | E.Eop(_, op, es) when E.is_op_tuple op -> 
+      let es = clear_pub pub (Array.to_list es) in
+      if es = [] then None 
+      else 
+        begin match E.Se.elements (E.Se.of_list es) with
+        | [e] -> Some e 
+        | es  -> Some (E.tuple_nodup (Array.of_list es))
+        end
+    | _ -> Some e 
+  
+let remove_subtuple pin pout obs =
   let pin = E.Se.of_list (List.map E.pub pin) in
-  (* Remove public inputs *)
-  let obs = E.Se.diff obs pin in
-  (* Remove subtuple *)
+  (* Remove public inputs and output *)
   let obs = E.Se.elements obs in
-(*  Format.printf "@[<v>possible observations:@ %a@]@."
+  let fromtbl = E.He.create (List.length obs) in
+  let tokeep = ref E.Se.empty in
+  let add e0 = 
+    match clear_pub_e (E.Se.union pin pout) e0 with
+    | None -> ()
+    | Some e -> E.He.add fromtbl e e0;
+                tokeep := E.Se.add e !tokeep in
+  List.iter add obs;
+  (* Remove subtuple *)
+  (*  Format.printf "@[<v>possible observations:@ %a@]@."
     (pp_list "@ " E.pp_expr) obs; *)
   let cmp e1 e2 =
     match e1.E.e_node, e2.E.e_node with
@@ -916,6 +952,7 @@ let remove_subtuple pin obs =
     | E.Eop(_,o1,_), _ when E.is_op_tuple o1 -> -1
     | _, E.Eop(_,o2,_) when E.is_op_tuple o2 -> 1
     | _, _ -> 0 in
+  let obs = E.Se.elements !tokeep in
   let obs = List.sort cmp obs in
   let tbl = E.He.create 107 in
   let robs = ref E.Se.empty in
@@ -946,7 +983,7 @@ let remove_subtuple pin obs =
         end
   in
   List.iter doit obs;
-  E.Se.elements !robs
+  E.Se.elements !robs, fromtbl
 
 let build_obs_func ~ni ~trans ~glitch loc f =
   let nb_shares = ref 0 in
@@ -1020,6 +1057,19 @@ let build_obs_func ~ni ~trans ~glitch loc f =
         try pp_e (E.He.find obs e) e 
         with Not_found -> assert false } in
 
+  let pout0 = 
+    List.map (fun x ->
+        let e = subst_v s x in
+        let pp fmt () =
+          Format.fprintf fmt "(* public output %a *)@ "
+            (pp_var ~full:dft_pinfo) x in
+        let e = if glitch then glitch_expr None e
+                else expr_of_pexpr e in
+        add_observation obs e pp;
+        e) f.f_pout in
+  let pout1 = E.Se.of_list pout0 in
+  let pout = E.tuple_nodup (Array.of_list (E.Se.elements pout1)) in
+        
   let interns, out, rndo =
     match ni with
     | `Threshold -> all, [], []
@@ -1027,15 +1077,15 @@ let build_obs_func ~ni ~trans ~glitch loc f =
     | `SNI ->
       (* Compute the set of output *)
       let out = List.map E.Se.of_list out in
-      let torm = List.fold_left E.Se.union E.Se.empty out  in
+      let to_rm = List.fold_left E.Se.union E.Se.empty out  in
       (* Remove out from the set of obs *)
-      E.Se.diff all torm, List.map E.Se.elements out, []
+      E.Se.diff all to_rm, List.map E.Se.elements out, []
     | `RSNI -> 
       (* Compute the set of output *)
       let out0 = List.map E.Se.of_list out in
-      let torm = List.fold_left E.Se.union E.Se.empty out0  in
+      let to_rm = List.fold_left E.Se.union E.Se.empty out0  in
       (* Remove out from the set of obs *)
-      let interns = E.Se.diff all torm in
+      let interns = E.Se.diff all to_rm in
       let add_priv e = 
         let ty = 
           match E.type_of_expr e with
@@ -1061,7 +1111,7 @@ let build_obs_func ~ni ~trans ~glitch loc f =
 
   verbose 1 "number of internal observations = %i@." (E.Se.cardinal interns);
   pp_elems (E.Se.elements interns);
-  let interns = remove_subtuple f.f_pin interns in
+  let interns, fromtbl = remove_subtuple f.f_pin pout1 interns in
   verbose 1 "after removing: number of internal observations = %i@."
     (List.length interns);
   pp_elems interns;
@@ -1069,11 +1119,20 @@ let build_obs_func ~ni ~trans ~glitch loc f =
   verbose 1 "number of output observations = %i@." (List.length fout);
   pp_elems fout;
   (* Now build the list of Checker.expr_info *)
-  let mk_ei e = mk_ei e e in
+  let out     = List.map (List.map (fun e -> mk_ei e e)) out in
+  let mk_ei e = 
+    let e0 = try E.He.find fromtbl e with Not_found -> assert false in
+    mk_ei e e0 in
   let interns = List.map mk_ei interns in
-  let out     = List.map (List.map mk_ei) out in
 
-  (params, !nb_shares, interns, out, rndo)
+  let pout = 
+    { Checker.red_expr = pout;
+      Checker.pp_info =
+        fun fmt () -> 
+           List.iter (fun e -> (E.He.find obs e) fmt ()) pout0;
+           Format.fprintf fmt "@[%a@]@ " E.pp_expr pout } in
+
+  (params, !nb_shares, interns, out, pout, rndo)
 
 (* --------------------------------------------------------------- *)
 
