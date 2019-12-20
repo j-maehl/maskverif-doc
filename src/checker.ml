@@ -158,24 +158,24 @@ let find_bij opt _n state (continue:t_continue) ldfs =
         (fun ldf -> List.map (fun ei -> ei.red_expr) ldf.L.l)
       ldfs
     in
-    Format.eprintf "Cannot check @[<v>%a@]@."
-      (pp_list "@ " Expr.pp_expr) es; 
+ (*   Format.eprintf "Cannot check @[<v>%a@]@."
+      (pp_list "@ " Expr.pp_expr) es; *)
  (*   Format.eprintf "state = %a@." State.pp_state state; *)
 (*    Format.eprintf "."; Format.pp_print_flush Format.err_formatter (); *)
 
     let etbl = 
       try let res = Pexpr.check_indep continue es other in
-          Format.eprintf "Checked using Pexpr@.";
+(*          Format.eprintf "Checked using Pexpr@."; *)
           res
       with 
-      | Pexpr.Depend ->
-        Format.eprintf "start poly@.";
+      | Pexpr.Depend -> 
+(*        Format.eprintf "start poly@."; *)
         let ind = Poly_solve.check_indep continue es in
-        Format.eprintf "end poly@.";
+(*        Format.eprintf "end poly@."; *)
 
         if ind then
           let etbl = He.create 101 in
-          Format.eprintf "Checked using Poly_solve@.";
+(*          Format.eprintf "Checked using Poly_solve@."; *)
           List.iter (fun e -> He.replace etbl e ()) es;
           etbl
         else 
@@ -416,9 +416,11 @@ let check_ni opt ?(para=false) ?fname params nb_shares ~order ?outpub all =
     let state = init_state nb_shares params in
     let args = L.cons order all len (init_outpub outpub) in 
     check_all_opt opt ~para state (continue_k order) args;
-    Format.printf "%a@." pp_ok (fname,"NI at order "^string_of_int order)
+    Format.printf "%a@." pp_ok (fname,"NI at order "^string_of_int order);
+    true
   with CanNotCheck le ->
-    Format.eprintf "%a@." (pp_fail opt) (fname,"NI",le)
+    Format.eprintf "%a@." (pp_fail opt) (fname,"NI",le);
+    false
 
 let check_threshold opt ?(para=false) ?fname order params ?outpub all =
   try
@@ -426,9 +428,11 @@ let check_threshold opt ?(para=false) ?fname order params ?outpub all =
     let len = List.length all in
     let args = L.cons order all len  (init_outpub outpub) in
     check_all_opt opt ~para state (continue_k 0) args;
-    Format.printf "%a@." pp_ok (fname,"t-threshold secure")
+    Format.printf "%a@." pp_ok (fname,"t-threshold secure");
+    true
   with CanNotCheck le ->
-    Format.eprintf "%a@." (pp_fail opt) (fname,"t-threshold secure",le)
+    Format.eprintf "%a@." (pp_fail opt) (fname,"t-threshold secure",le);
+    false
 
 let check_fni opt ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ interns ?outpub outs =
   try
@@ -473,9 +477,11 @@ let check_fni opt ?(para = false) ?fname s f params nb_shares ~order ?from ?to_ 
     let pp_range fmt () =
       if from <> 0 || to_ <> order then
         Format.fprintf fmt " for range %i..%i" from to_ in
-    Format.printf "%a%a@." pp_ok (fname,s) pp_range ()
+    Format.printf "%a%a@." pp_ok (fname,s) pp_range ();
+    true
   with CanNotCheck le ->
-    Format.eprintf "%a@." (pp_fail opt) (fname,s,le)
+    Format.eprintf "%a@." (pp_fail opt) (fname,s,le);
+    false
 
 let check_sni opt ?para ?fname = 
   check_fni opt ?para "SNI" ?fname 

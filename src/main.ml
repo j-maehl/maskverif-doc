@@ -167,8 +167,8 @@ let add_func f =
     let o = { pp_error = true; checkbool = false; } in
 (*    Checker.check_sni o 
                 ~para:true ~fname:(data f.f_name) ?from:None ?to_:None params nb_shares ~order interns outputs; *)
-    Checker.check_rndo o ~para:true ~fname:(data f.f_name) params
-      nb_shares ~order rndo
+    ignore (Checker.check_rndo o ~para:true ~fname:(data f.f_name) params
+      nb_shares ~order rndo)
     
     
 
@@ -178,10 +178,10 @@ let rec process_command c =
     add_operator o ty bij
   | Func f ->
     add_func f
-  | NI (f,o)     -> check_ni f (process_check_opt o)
-  | SNI (f,b,o)  -> check_sni f b (process_check_opt o)
-  | SPINI(f,b,o) -> check_spini f b (process_check_opt o)                  
-  | Probing(f,o) -> check_threshold f (process_check_opt o)
+  | NI (f,o)     -> ignore(check_ni f (process_check_opt o))
+  | SNI (f,b,o)  -> ignore(check_sni f b (process_check_opt o))
+  | SPINI(f,b,o) -> ignore(check_spini f b (process_check_opt o))
+  | Probing(f,o) -> ignore(check_threshold f (process_check_opt o))
   | Read_file filename ->
     Format.eprintf "read_file %s@." (data filename);
     process_file filename
