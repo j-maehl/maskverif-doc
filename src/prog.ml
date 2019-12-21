@@ -1051,10 +1051,10 @@ let build_obs_func ~ni ~trans ~glitch loc f =
   let pp_e pp e fmt () =
     pp fmt ();
     Format.fprintf fmt "@[%a@]@ " E.pp_expr e in
-  let mk_ei e e' =
-    { Checker.red_expr = e';
+  let mk_ei e0 e =
+    { Checker.red_expr = e;
       Checker.pp_info =
-        try pp_e (E.He.find obs e) e 
+        try pp_e (E.He.find obs e0) e0 
         with Not_found -> assert false } in
 
   let pout0 = 
@@ -1122,7 +1122,7 @@ let build_obs_func ~ni ~trans ~glitch loc f =
   let out     = List.map (List.map (fun e -> mk_ei e e)) out in
   let mk_ei e = 
     let e0 = try E.He.find fromtbl e with Not_found -> assert false in
-    mk_ei e e0 in
+    mk_ei e0 e in
   let interns = List.map mk_ei interns in
 
   let pout = 
