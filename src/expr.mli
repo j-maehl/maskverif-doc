@@ -1,10 +1,11 @@
-type ty = W1 | W8 | W16 | W32 | W64
+type ty = W1 | W8 | W16 | W32 | W64 | INT
 
 val w1    : ty 
 val w8    : ty
 val w16   : ty
 val w32   : ty
 val w64   : ty
+val int   : ty
 
 val ty_size : ty -> int
 val ty2string : ty -> string 

@@ -13,7 +13,7 @@
 %token <string>SNI NI PROBING SPINI PRINT STRING
 
 %token <string>READ_FILE READ_ILANG
-%token BOOL W1 W8 W16 W32 W64
+%token BOOL W1 W8 W16 W32 W64 TINT
 %token TRANSITION NOGLITCH PARA ORDER VERBOSE NOBOOL NOPRINT 
 %token <string> IDENT OIDENT
 %token <int> INT
@@ -75,6 +75,7 @@ typ:
   | W16  { Expr.w16 }
   | W32  { Expr.w32 }
   | W64  { Expr.w64 }
+  | TINT { Expr.int }
 
 id_range_decl:
   | ty=typ? x=ident r=range? { 

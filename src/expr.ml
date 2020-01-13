@@ -1,12 +1,13 @@
 open Util
 
-type ty = W1 | W8 | W16 | W32 | W64
+type ty = W1 | W8 | W16 | W32 | W64 | INT
 
 let w1  = W1 
 let w8  = W8
 let w16 = W16
 let w32 = W32
 let w64 = W64
+let int = INT
 
 let ty_size = function
   | W1  -> 1
@@ -14,8 +15,12 @@ let ty_size = function
   | W16 -> 16
   | W32 -> 32
   | W64 -> 64
+  | INT -> assert false
 
-let ty2string ty = "w" ^ string_of_int (ty_size ty)
+let ty2string ty = 
+  match ty with
+  | INT -> "int"
+  | _   -> "w" ^ string_of_int (ty_size ty)
   
 (* ----------------------------------------------------------------------- *)
 type var = {
@@ -133,12 +138,15 @@ let o_negw16 = mk_neg w16 "~w16"
 let o_negw32 = mk_neg w32 "~w32"
 let o_negw64 = mk_neg w64 "~w64"
 
+
+
 let o_neg = function
   | W1  -> o_negb
   | W8  -> o_negw8
   | W16 -> o_negw16
   | W32 -> o_negw32
   | W64 -> o_negw64
+  | _   -> assert false
 
 let o_add = function
   | W1  -> o_addb
@@ -146,6 +154,7 @@ let o_add = function
   | W16 -> o_addw16
   | W32 -> o_addw32
   | W64 -> o_addw64
+  | _   -> assert false
 
 let o_mul = function
   | W1  -> o_mulb
@@ -153,6 +162,7 @@ let o_mul = function
   | W16 -> o_mulw16
   | W32 -> o_mulw32
   | W64 -> o_mulw64
+  | _   -> assert false
 
 let o_tuple = Op.make "" None NotBij Other
 
@@ -189,7 +199,10 @@ module C = struct
     { c_ty = ty; c_val = Z.zero }
 
   let one ty = 
-    { c_ty = ty; c_val = Z.pred (Z.shift_left Z.one (ty_size ty)) }
+    if ty = INT then
+      { c_ty = ty; c_val = Z.one}
+    else
+      { c_ty = ty; c_val = Z.pred (Z.shift_left Z.one (ty_size ty)) }
 
   let make ty z = 
     assert (Z.leq Z.zero z && Z.leq z (one ty).c_val); 
