@@ -126,13 +126,17 @@ end = struct
     match l1 with
     | [] -> l2
     | ldf::l1 -> rev_append l1 ({ ldf with c = Z.mul ldf.cnp (cnp_ldfs l2) }::l2)
-                                                 
 end
 
 exception CanNotCheck of expr_info list
 
-let pp_eis fmt =
-  pp_list "" (fun fmt ei -> ei.pp_info fmt ()) fmt
+let rec pp_eis fmt ls =
+  match ls with
+  | []    -> ()
+  | [e]   -> Format.fprintf fmt "probe on@   @[<v>%a@]"
+               e.pp_info ()
+  | e::es -> Format.fprintf fmt "probe on@   @[<v>%a@]@ %a"
+               e.pp_info () pp_eis es
 
 let print_error opt fmt lhd =
   Format.fprintf fmt "@[<v>Cannot check@ ";
@@ -140,7 +144,7 @@ let print_error opt fmt lhd =
     Format.fprintf fmt "%a@ reduce to@ %a"
       pp_eis lhd
       (pp_list ",@ " (fun fmt ei -> pp_expr fmt ei.red_expr)) lhd;
-  Format.fprintf fmt "@]"
+  Format.fprintf fmt "@]@."
 
 let find_bij _opt _n state (continue:t_continue) ldfs =
   let lhd = L.lfirst ldfs in

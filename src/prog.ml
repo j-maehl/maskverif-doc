@@ -733,7 +733,7 @@ module Process = struct
 end
 
 (* ------------------------------------------------------------------ *)
-(* Buildind the set of possible observations *)
+(* Building the set of possible observations *)
 (*
   x = { e } // pas de glitches
   x := e1 op e2 // genere des glitches
@@ -754,7 +754,7 @@ let rec expr_of_pexpr e =
 let subst_v s x =
   try E.Hv.find s x
   with Not_found ->
-    Format.eprintf "Can not find %a@." (pp_var ~full:dft_pinfo) x;
+    Format.eprintf "Cannot find %a@." (pp_var ~full:dft_pinfo) x;
     assert false
 
 let rec subst_e s e =
@@ -1054,22 +1054,23 @@ let build_obs_func ~ni ~trans ~glitch loc f =
   let mk_ei e0 e =
     { Checker.red_expr = e;
       Checker.pp_info =
-        try pp_e (E.He.find obs e0) e0 
+        try pp_e (E.He.find obs e0) e0
         with Not_found -> assert false } in
 
-  let pout0 = 
+  let pout0 =
     List.map (fun x ->
         let e = subst_v s x in
+        let e' = if glitch then glitch_expr None e
+          else expr_of_pexpr e in
         let pp fmt () =
-          Format.fprintf fmt "(* public output %a *)@ "
-            (pp_var ~full:dft_pinfo) x in
-        let e = if glitch then glitch_expr None e
-                else expr_of_pexpr e in
-        add_observation obs e pp;
-        e) f.f_pout in
-  let pout1 = E.Se.of_list pout0 in
+          Format.fprintf fmt "(* public output %a = %a *)"
+            (pp_var ~full:dft_pinfo) x
+            E.pp_expr e' in
+        add_observation obs e' pp;
+        e', pp) f.f_pout in
+  let pout1 = E.Se.of_list (List.map fst pout0) in
   let pout = E.tuple_nodup (Array.of_list (E.Se.elements pout1)) in
-        
+
   let interns, out, rndo =
     match ni with
     | `Threshold -> all, [], []
@@ -1125,12 +1126,23 @@ let build_obs_func ~ni ~trans ~glitch loc f =
     mk_ei e0 e in
   let interns = List.map mk_ei interns in
 
-  let pout = 
+  (* construct the single public output observation *)
+  let pout =
     { Checker.red_expr = pout;
       Checker.pp_info =
-        fun fmt () -> 
-           List.iter (fun e -> (E.He.find obs e) fmt ()) pout0;
-           Format.fprintf fmt "@[%a@]@ " E.pp_expr pout } in
+        (* pretty print nicely *)
+        fun fmt () ->
+          let rec pp fmt (lps:(E.expr * obs_info) list) =
+            match lps with
+            | [] -> ()
+            | [e,ppe] -> Format.fprintf fmt "@[<v>%a@,  => %a @]"
+                           ppe () (E.He.find obs e) ()
+            | (e,ppe)::lps -> Format.fprintf fmt "@[<v>%a@,  => %a@]@,%a"
+                                ppe () (E.He.find obs e) ()
+                                pp lps in
+          pp fmt pout0;
+          Format.fprintf fmt "@.merged into@ @[<v>%a@]@." E.pp_expr pout
+    } in
 
   (params, !nb_shares, interns, out, pout, rndo)
 
