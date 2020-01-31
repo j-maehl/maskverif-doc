@@ -205,9 +205,12 @@ module C = struct
       { c_ty = ty; c_val = Z.pred (Z.shift_left Z.one (ty_size ty)) }
 
   let make ty z = 
-    assert ((Z.leq Z.zero z && Z.leq z (one ty).c_val) || ty == int); 
-    { c_ty = ty; c_val = z }
-     
+    if (ty = INT || (Z.leq Z.zero z && Z.leq z (one ty).c_val)) then
+      { c_ty = ty; c_val = z }
+    else
+      (Format.eprintf "C.make : %s %a@." (ty2string ty) Z.pp_print z;
+       assert false)
+         
   let _true = one w1 
   let _false = zero w1
 

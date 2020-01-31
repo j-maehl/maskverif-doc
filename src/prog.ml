@@ -165,6 +165,8 @@ let pp_func ?(full=dft_pinfo) fmt func =
   Format.fprintf fmt "@[<hov>extra input: @[%a@]@]@ " 
     (pp_list ",@ " (pp_var ~full)) func.f_ein;
   Format.fprintf fmt "@[<hov>outputs: @[%a@]@]@ " (pp_decls ~full) func.f_out;
+  Format.fprintf fmt "@[<hov>public outputs: @[%a@]@]@ "
+    (pp_list ",@ " (pp_var ~full)) func.f_pout;
   Format.fprintf fmt "@[<hov>randoms: @[%a@]@]@ "
     (pp_list ",@ " (pp_var ~full)) func.f_rand;
   Format.fprintf fmt "@[<hov>others : @[%a@];@]@ @ "

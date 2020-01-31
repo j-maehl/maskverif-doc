@@ -45,7 +45,7 @@ library: shrcntlow maskverif.cmx maskverif.cmo maskverif.cma maskverif.cmxa mask
 		src/*.{mli,ml,mll,mly,c,mllib,mlpack} \
 		_build/src/shrcnt_low.o \
 		_build/src/*.{cmt,cmti}
-	rm `ocamlfind query maskverif`/main.*
+	rm `ocamlfind query maskverif`/main.* || true
 
 install: uninstall native library
 	@if [[ ":${PATH}:" == *":${HOME}/.local/bin:"* ]]; then\

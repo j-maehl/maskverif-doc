@@ -6,4 +6,5 @@ stdenv.mkDerivation {
   buildInputs = [ ]
     ++ (with ocamlPackages; [ ocaml findlib ocamlbuild menhir zarith merlin ocamlgraph])
     ;
+  preBuild = "mkdir -p $out/lib/ocaml/${ocaml.version}/site-lib || true";
 }
