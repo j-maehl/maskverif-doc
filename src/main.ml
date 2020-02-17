@@ -192,6 +192,8 @@ let rec process_command c =
   | Print f ->
     let func = Prog.get_global globals f in
     Format.printf "%a@." (Prog.pp_func ~full:Prog.var_pinfo) func
+  | Reset ->
+    Hashtbl.reset globals
   | Verbose i -> Util.set_verbose (data i)
   | Exit ->
     Format.eprintf "Bye bye!@.";

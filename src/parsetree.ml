@@ -95,6 +95,7 @@ type command =
   | Read_file  of string located
   | Read_ilang of string located
   | Print      of ident
+  | Reset
   | Verbose    of int located
   | Exit
 

@@ -14,7 +14,7 @@
 
 %token <string>READ_FILE READ_ILANG
 %token BOOL W1 W8 W16 W32 W64 TINT
-%token TRANSITION NOGLITCH PARA ORDER VERBOSE NOBOOL NOPRINT 
+%token TRANSITION NOGLITCH PARA ORDER VERBOSE NOBOOL NOPRINT RESET
 %token <string> IDENT OIDENT
 %token <int> INT
 %token <Z.t> LIT
@@ -226,6 +226,7 @@ command1:
   | f=loc(READ_FILE)                     { Read_file f  }
   | f=loc(READ_ILANG)                    { Read_ilang f }
   | f=loc(PRINT)                         { Print f }
+  | RESET                                { Reset }
   | VERBOSE i=loc(INT)                   { Verbose i }
   | error             { parse_error (Location.make $startpos $endpos) None }
 

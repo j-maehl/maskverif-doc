@@ -39,6 +39,7 @@
     "read_ilang", READ_ILANG "";
     "para", PARA;
     "noglitch", NOGLITCH;
+    "reset", RESET;
     "transition", TRANSITION;
     "nobool", NOBOOL;
     "noprint", NOPRINT;
