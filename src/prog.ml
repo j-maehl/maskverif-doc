@@ -887,7 +887,9 @@ let rec build_obs ~trans ~glitch obs s c =
           add_trans obs etrans e pp;
           Ebox e
       | P.IK_noleak ->
-        e
+        let e = expr_of_pexpr e in
+        (* stop propagation of glitches *)
+        Ebox e
     in
     E.Hv.replace s i.i_var e;
     build_obs ~trans ~glitch obs s c
