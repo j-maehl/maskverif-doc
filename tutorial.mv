@@ -156,7 +156,7 @@ end
 
 Probing DOM_AND
 NI DOM_AND
-SNI DOM_AND
+(* SNI DOM_AND *)
 
 proc DOM_AND_SNI:
   inputs: a[0:1], b[0:1]

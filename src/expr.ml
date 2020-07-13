@@ -181,7 +181,7 @@ module C = struct
     { c_ty = ty; c_val = Z.pred (Z.shift_left Z.one (ty_size ty)) }
 
   let make ty z = 
-    assert (Z.leq Z.zero z && Z.lt z (one ty).c_val);
+    assert (Z.leq Z.zero z && Z.leq z (one ty).c_val);
     { c_ty = ty; c_val = z }
      
   let _true = one w1 
