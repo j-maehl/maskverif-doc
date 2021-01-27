@@ -1,14 +1,27 @@
-To compile the tool, the best way is to use nix
+### Quickstart
 
-Start doing
-
+To compile maskverif quickly, the best way is to use nix (https://nixos.org/):
 > nix-shell
-> make 
+> make
 
-Then you can start using it iteractively by doing 
-./maskverif 
+Then you can start using it iteractively by doing
+> ./maskverif
 or by passing a .mv file
-./maskverif < tutorial.mv
+> ./maskverif < tutorial.mv
 
-A small tutorial is provide in tutorial.mv
+A small tutorial is provided in 'tutorial.mv'.
 
+
+### Installing maskverif in your system or as a library for scVerif:
+
+First, install the ocaml package manager "opam" according to:
+https://opam.ocaml.org/doc/Install.html
+Remeber to run "eval $(opam env)", to update your path according.
+Some distributions ship outdated versions of opam, make sure "opam --version" reports 2.0.x.
+
+Then, run:
+> sudo apt-get install libgmp-dev m4
+> opam pin add .
+
+To remove the executable, including libraries run:
+> opam pin remove maskverif

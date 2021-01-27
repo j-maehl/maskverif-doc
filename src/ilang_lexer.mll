@@ -1,5 +1,5 @@
 {
-  open Util
+  open Maskverif.Util
   open Ilang_parser
 
   let pp_lex_error fmt msg =

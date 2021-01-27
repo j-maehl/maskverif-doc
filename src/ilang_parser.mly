@@ -1,5 +1,5 @@
 %{
-    open Util
+    open Maskverif.Util
     open Ilang_ast
     let parse_error loc msg = raise (ParseError (loc, msg))
 

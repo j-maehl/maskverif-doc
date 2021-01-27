@@ -1,4 +1,4 @@
-open Util
+open Maskverif.Util
 
 type ident = string located
 

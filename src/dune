@@ -1,0 +1,38 @@
+(env
+  (dev (flags
+    :standard
+    -safe-string
+    -g
+    -w -1..66-4-9-41-44-60
+  ))
+  (release (flags
+    :standard
+    -safe-string
+    -g
+  ))
+)
+
+(library
+ (name maskverif)
+ (public_name maskverif)
+ (modules checker expr parsetree pexpr poly poly_solve prog shrcnt state util)
+ (libraries zarith ocamlgraph batteries unix menhirLib)
+ (foreign_stubs
+  (language c)
+  (names shrcnt_low)
+  (flags (-lrt -fPIC -linkall)))
+  (c_library_flags -lrt))
+
+(ocamllex
+  (modules ilang_lexer lexer))
+
+(menhir
+ (modules ilang_parser parser))
+
+(executable
+ (name main)
+ (public_name maskverif)
+ (promote (until-clean) (into ..))
+ (modules main parser lexer ilang ilang_ast ilang_lexer ilang_parser)
+ (package maskverif)
+ (libraries maskverif))
