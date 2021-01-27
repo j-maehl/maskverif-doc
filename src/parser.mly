@@ -1,4 +1,5 @@
 %{
+  open Maskverif
   open Util
   open Parsetree
   let parse_error loc msg = raise (ParseError (loc, msg))

@@ -1,4 +1,6 @@
-To compile maskverif, the best way is to use nix:
+### Quickstart
+
+To compile maskverif quickly, the best way is to use nix (https://nixos.org/):
 > nix-shell
 > make
 
@@ -10,16 +12,16 @@ or by passing a .mv file
 A small tutorial is provided in 'tutorial.mv'.
 
 
+### Installing maskverif in your system or as a library for scVerif:
 
-To install maskverif as a library for ocamlfind use:
-> sudo apt-get install libgmp-dev m4
-> opam install zarith ocamlbuild menhir ocamlgraph batteries
-> make library
-
-To install maskverif as executable in your path without opam use:
-> make install
-
+First, install the ocaml package manager "opam" according to:
+https://opam.ocaml.org/doc/Install.html
 Remeber to run "eval $(opam env)", to update your path according.
+Some distributions ship outdated versions of opam, make sure "opam --version" reports 2.0.x.
+
+Then, run:
+> sudo apt-get install libgmp-dev m4
+> opam pin add .
 
 To remove the executable, including libraries run:
-> make uninstall
+> opam pin remove maskverif

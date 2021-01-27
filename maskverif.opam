@@ -4,14 +4,17 @@ version: "dev"
 maintainer: "Benjamin Gregoire"
 license: "CeCILL-B"
 bug-reports: "https://gitlab.com/benjgregoire/maskverif/issues"
-build: [make "native"]
-install: [
-  [make "library"]
-  ["cp" "main.native" "%{bin}%/maskverif"]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
 ]
-remove: [
-  ["ocamlfind" "remove" "maskverif"]
-  ["rm" "-f" "%{bin}%/maskverif"]
-  ]
+depends: [
+  "ocaml" {>= "4.07.1"}
+  "dune"
+  "zarith"
+  "menhir"
+  "ocamlgraph"
+  "batteries"
+]
+homepage: "https://gitlab.com/benjgregoire/maskverif"
 dev-repo: "git+https://gitlab.com/benjgregoire/maskverif.git"
 synopsis: "Maskverif is a tool to check the security of masked algorithms"
