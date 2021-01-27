@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "maskverif"
-version: "dev"
+version: "0.8.0-ches"
 maintainer: "Benjamin Gregoire"
 license: "CeCILL-B"
 bug-reports: "https://gitlab.com/benjgregoire/maskverif/issues"
