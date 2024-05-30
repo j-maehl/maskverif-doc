@@ -1,0 +1,22 @@
+(env
+ (dev     (flags :standard -rectypes -warn-error -a+31 -w +28+33-9-23-32-58-67-69))
+ (release (flags :standard -rectypes -warn-error -a+31 -w +28+33-9-23-32-58-67-69)
+          (ocamlopt_flags -O3 -unbox-closures)))
+
+(include_subdirs unqualified)
+
+(executable
+  (public_name mask-verif)
+  (name maskverif)
+  (modules :standard)
+  (foreign_stubs
+    (language c)
+    (names shrcnt_low))
+  (promote (until-clean) (into ..))
+  (libraries menhirLib ocamlgraph unix zarith))
+
+(ocamllex lexer ilang_lexer)
+
+(menhir
+  (modules parser ilang_parser)
+  (flags --table --explain))

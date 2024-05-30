@@ -100,7 +100,7 @@ let initial_check_indep k ps =
       if k < n then raise Depend
       else
         Hv.replace tbl p (Sint.add i si, n) in
-  let rec is_indep1 v =
+  let is_indep1 v =
     match v.e_node with
     | Eshare(p,i,_) -> add p i
     | _ -> () in
