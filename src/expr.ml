@@ -392,3 +392,48 @@ let type_of_expr e =
     match op.op_ty with
     | Some(_,codom) -> Some(codom)
     | None -> None
+
+
+(* ------------------------------------------------------------------- *)
+
+let destruct_xor e = 
+  match e.e_node with
+  | Eop2(o, e1, e2) when Op.equal o o_addb -> e1, e2
+  | _ -> raise Not_found 
+
+let destruct_and e = 
+  match e.e_node with
+  | Eop2(o, e1, e2) when Op.equal o o_mulb -> e1, e2
+  | _ -> raise Not_found
+
+let destruct_not e = 
+  match e.e_node with
+  | Eop1(o, e1) when Op.equal o o_negb -> e1
+  | _ -> raise Not_found
+
+
+let rewrite e = 
+  try 
+    let e1, e2 = destruct_xor e in
+    let e11, a = destruct_and e1 in
+    let e21, r = destruct_and e2 in 
+    let b, r' = destruct_xor e11 in 
+    let a' = destruct_not e21 in
+    if E.equal r r' && E.equal a a' then 
+      op2 o_addb (op2 o_mulb a b) r
+    else e
+  with Not_found -> e
+
+let rec simplify_expr tbl e = 
+  try He.find tbl e 
+  with Not_found ->
+    let e' = rewrite e in
+    let e' = 
+      match e'.e_node with 
+      | Eop1(o, e) -> op1 o (simplify_expr tbl e)
+      | Eop2(o, e1, e2) -> op2 o (simplify_expr tbl e1) (simplify_expr tbl e2)
+      | Eop(_, o, es)   -> op o (Array.map (simplify_expr tbl) es)
+      | _ -> e in
+    He.add tbl e e';
+    e'
+

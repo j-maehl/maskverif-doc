@@ -9,7 +9,16 @@ type node = {
   mutable descriptor : descriptor;     (* The current value of the node *)
           expr_desc  : expr;           (* Current expression representing
                                           the node, and its original version *)
+  mutable class_size  : int;           (* the size of the class *)
+                                       (*   < 0 means the class is not computed *)
+                                       (*   = 0 means the node is a public term *)
+  mutable class_parent : class_parent;
+
 }
+
+and class_parent = 
+  | CPnone 
+  | CPsome of {mutable parent : node; }
 
 and descriptor =
 | Top
@@ -61,6 +70,8 @@ let top_node = {
   children = Vector.dummy ();
   descriptor = Top;
   expr_desc  = top;
+  class_size = -1;
+  class_parent = CPnone;
 }
 
 (* ----------------------------------------------------------------------- *)
@@ -110,28 +121,34 @@ module Pinfo = struct
 
   type t = {
     mutable nb_used_shares : int;
-            p_shares       : node Stack.t;
+    mutable used_shares    : SmallSet.t;
   }
 
-  let init nb_params = {
-    nb_used_shares = 0;
-    p_shares = Stack.make nb_params top_node;
-  }
+  let empty () = {
+      nb_used_shares = 0;
+      used_shares    = SmallSet.empty;
+    }
 
-  let declare info share =
-    Stack.push info.p_shares share
+  let copy pi = { nb_used_shares = pi.nb_used_shares; used_shares = pi.used_shares }
 
-  let incr info =
-    info.nb_used_shares <- info.nb_used_shares + 1
+  let add_share i info = 
+    if (not (SmallSet.mem i info.used_shares)) then begin 
+        info.nb_used_shares <- info.nb_used_shares + 1;
+        info.used_shares <- SmallSet.add info.used_shares i
+      end
 
-  let decr info =
-    info.nb_used_shares <- info.nb_used_shares - 1
+  let remove_share i info = 
+    if (SmallSet.mem i info.used_shares) then begin
+        info.nb_used_shares <- info.nb_used_shares - 1;
+        info.used_shares <- SmallSet.remove info.used_shares i
+      end
 
-  let iter f info = Stack.iter f info.p_shares
+  let iter f info = SmallSet.iter f info.used_shares
 
   let clear info =
     info.nb_used_shares <- 0;
-    Stack.clear info.p_shares
+    info.used_shares <- SmallSet.empty
+
 
 end
 
@@ -142,6 +159,7 @@ type state = {
     s_count    : Count.t;
     s_hash     : node He.t;
     s_params   : Pinfo.t Hv.t;
+    s_shares   : node array Hv.t;
     s_randoms  : node Stack.t;  (* random nodes *)
     s_todo     : node Stack.t;  (* next random to eliminate *)
     s_top      : node Vector.t; (* parents of top *)
@@ -154,20 +172,25 @@ let init_state nb_shares params =
   let s_count = Count.init () in
 
   (* Create the node corresponding to each share *)
-  let s_params = Hv.create (2 * List.length params) in
-  List.iter (fun p ->
-    let p_info = Pinfo.init nb_shares in
-    Hv.add s_params p p_info) params;
+  let nb_params  =  List.length params in
+  let s_shares   = Hv.create nb_params in
+  let s_params   = Hv.create nb_params in
+
+  List.iter (fun p -> 
+    let p_info = Pinfo.empty () in
+    let a = Array.make nb_shares top_node in
+    Hv.add s_params p p_info;
+    Hv.add s_shares p a) params;
 
   (* Add top to the hash table *)
-  let s_hash = He.create 1000 in
+  let s_hash = He.create 100 in
   He.add s_hash top top_node;
-
   (* Build the final state *)
   { s_nb_shares = nb_shares;
     s_count;
     s_hash;
     s_params;
+    s_shares;
     s_randoms = Stack.make 1000 top_node;
     s_todo = Stack.make 1000 top_node;
     s_top  = Vector.create 1000 top_node;
@@ -215,22 +238,23 @@ let pp_state fmt state =
 
 (* ----------------------------------------------------------------------- *)
 
-let add_used_share state p =
-  Pinfo.incr (Hv.find state.s_params p)
+let add_used_share state p i =
+  Pinfo.add_share i (Hv.find state.s_params p)
 
-let rm_used_share state p =
-  Pinfo.decr (Hv.find state.s_params p)
+let rm_used_share state p i =
+  Pinfo.remove_share i (Hv.find state.s_params p)
 
-let declare_share state p n =
-  Pinfo.declare (Hv.find state.s_params p) n
+let declare_share state p i n =
+  let a = Hv.find state.s_shares p in
+  a.(i) <- n
 
 let declare_random state n =
   Stack.push state.s_randoms n
 
 let add_children state p c =
   begin match p.descriptor with
-  | Share(x,_,_) when Vector.size p.children = 0 ->
-    add_used_share state x
+  | Share(x,i,_) when Vector.size p.children = 0 ->
+    add_used_share state x i
   | _ -> ()
   end;
   Vector.push p.children c
@@ -280,13 +304,16 @@ let rec add_expr state e =
       { node_id    = Count.next state.s_count;
         children   = Vector.create 3 top_node;
         descriptor = descriptor;
-        expr_desc  = e; } in
+        expr_desc  = e; 
+        class_parent = CPnone;
+        class_size   = -1;
+      } in
     (* add the node to the parents *)
     set_parents state n;
     He.add state.s_hash e n;
     begin match descriptor with
     | Rnd _        -> declare_random state n
-    | Share(p,_,_) -> declare_share state p n
+    | Share(p,i,_) -> declare_share state p i n
     | _            -> ()
     end;
     n
@@ -312,7 +339,7 @@ and remove_node state n =
   match n.descriptor with
   | Top   -> assert false
   | Rnd _ -> ()
-  | Share(a,_,_) -> rm_used_share state a
+  | Share(a,i,_) -> rm_used_share state a i
   | Pub _ -> ()
   | Const _ -> ()
   | Op1(_,p) -> remove_child state p n
@@ -440,28 +467,28 @@ let clear_bijection state =
   Stack.iter (fun (n,_) -> remove_node_and_all_children state n) state.s_bij
 
 (* ----------------------------------------------------------------------- *)
+let used_share = 
+  let tbl = Hv.create 100 in
+  fun state -> 
+    Hv.clear tbl;
+    Hv.iter (fun p pi -> Hv.add tbl p (Pinfo.copy pi)) state.s_params;
+    fun p i -> 
+    try SmallSet.mem i (Hv.find tbl p).Pinfo.used_shares 
+    with Not_found -> false 
 
-let used_share =
-  let hn = Hn.create 100 in
-  fun state ->
-  Hn.clear hn;
-  Hv.iter
-    (fun _ pinfo ->
-      Pinfo.iter
-        (fun na -> if Vector.size na.children <> 0 then Hn.add hn na ())
-        pinfo)
-    state.s_params;
-  fun n -> Hn.mem hn n
-
+let nb_used_share state = state.s_params
+  
+  
 (* ----------------------------------------------------------------------- *)
 
 exception Found of node
 
 let find_used_share_except state excepted =
   try
-    Hv.iter (fun _ pinfo ->
-      Pinfo.iter (fun na ->
-          if Vector.size na.children <> 0 && not (excepted na) then
+    Hv.iter (fun p pinfo -> 
+      Pinfo.iter (fun i -> 
+          if not (excepted p i) then
+            let na = (Hv.find state.s_shares p).(i) in
             raise (Found na)) pinfo) state.s_params;
     assert false
   with Found n -> n
@@ -517,3 +544,72 @@ let replay_bij1 state (e1, e2) =
 
 let replay_bij state bij =
   Stack.iter (replay_bij1 state) bij
+
+
+(* ------------------------------------------------------------------------ *)
+
+let mem_class n = 0 <= n.class_size
+
+let rec find_class n = 
+  assert (mem_class n);
+  match n.class_parent with
+  | CPnone -> n
+  | CPsome p ->
+    let np = p.parent in
+    let np' = find_class np in
+    if not (N.equal np np') then p.parent <- np';
+    np' 
+
+let union_class n1 n2 = 
+   assert (mem_class n1 && mem_class n2);
+   let p1 = find_class n1 in
+   let p2 = find_class n2 in
+   if not (N.equal p1 p2) then
+     let s1 = p1.class_size in
+     let s2 = p2.class_size in
+     let p1, p2 = 
+       if s2 < s1 then p2, p1 else p1, p2 in
+     p1.class_parent <- CPsome {parent = p2};
+     p2.class_size   <- s1 + s2
+
+let init_class state e = 
+
+  let all_pub = ref true in
+
+  let is_pub n = n.class_size = 0 in
+
+  let add_sub n n1 = 
+    if not (is_pub n1) then
+      (all_pub := false; union_class n n1) in
+
+  let rec init_class n = 
+    if n.class_size < 0 then 
+      match n.descriptor with
+      | Top             -> assert false
+      | Rnd _           -> n.class_size <- 1
+      | Pub _ | Const _ -> n.class_size <- 0
+      | Share _         -> n.class_size <- 1
+      | Op1(_, n1) ->
+        init_class n1;
+        if is_pub n1 then n.class_size <- 0
+        else (n.class_size <- 1; union_class n n1)
+      | Op2(_,n1,n2) ->
+        init_class n1; init_class n2;
+        n.class_size <- 1;
+        all_pub := true;
+        add_sub n n1; add_sub n n2;
+        if !all_pub then n.class_size <- 0;
+      | Tuple (_, _, ns) ->
+        Array.iter init_class ns;
+        n.class_size <- 1;
+        all_pub := true;
+        Array.iter (add_sub n) ns;
+        if !all_pub then n.class_size <- 0 in
+
+  init_class (add_expr state e)
+
+let get_class state e = 
+  let n = find_class (add_expr state e) in
+  assert (mem_class n);
+  if n.class_size = 0 then 0
+  else n.node_id

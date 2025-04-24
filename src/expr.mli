@@ -174,3 +174,6 @@ val pp_op :
 
 val pp_expr : expr Util.pp
 
+(* ------------------------------------------ *)
+
+val simplify_expr : expr He.t -> expr -> expr 

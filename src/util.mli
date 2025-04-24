@@ -6,6 +6,7 @@ module List : sig
     val is_empty : 'a list -> bool
     val equal : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
     val split : int -> 'a list -> 'a list * 'a list
+    val filter_map : ('a -> bool) -> ('a -> 'b) -> 'a list -> 'b list
   end
 
 val partition :
@@ -169,3 +170,26 @@ type tool_opt = {
     pp_error  : bool;
     checkbool : bool;
   }
+
+(* -------------------------------------------------------------- *)
+
+module SmallSet :
+  sig 
+    type t
+    val is_empty : t -> bool
+    val mem : int -> t -> bool
+
+    val empty : t
+    val singleton : int -> t 
+    val add   : t -> int -> t
+    val remove : t -> int -> t
+
+    val inter : t -> t -> t
+    val union : t -> t -> t 
+    val diff  : t -> t -> t
+
+    val card : t -> int 
+
+    val iter : (int -> unit) -> t -> unit
+    val fold : (int -> 'a -> 'a) -> 'a -> t -> 'a
+end

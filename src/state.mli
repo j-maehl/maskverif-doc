@@ -6,12 +6,22 @@ type node
 module Hn : Hashtbl.S with type key = node
 (* ----------------------------------------------------------------------- *)
 
+module Pinfo : sig
+
+  type t = {
+    mutable nb_used_shares : int;
+    mutable used_shares    : Util.SmallSet.t;
+  }
+
+end
+
 type state
 
 val pp_state : Format.formatter -> state -> unit
 
 val init_state  : int -> param list -> state
 val clear_state : state -> unit
+
 
 
 (* ----------------------------------------------------------------------- *)
@@ -47,11 +57,11 @@ val replay_bij : state -> bijection -> unit
 
 val clear_bijection : state -> unit
 
-val used_share : state -> node -> bool
+val used_share : state -> (param -> int -> bool)
 
-
-
-val simplify_until_with_clear : state -> (node -> bool) -> int -> unit
+val nb_used_share : state -> Pinfo.t Hv.t
+ 
+val simplify_until_with_clear : state -> (param -> int -> bool) -> int -> unit
 
 (*
 exception CanNotCheck of expr list
@@ -61,3 +71,8 @@ val simplify_until_with_clear2 :
 (* ----------------------------------------------------------------------- *)
 
 val is_top_expr : state -> expr -> bool
+
+(* ----------------------------------------------------------------------- *)
+
+val init_class : state -> expr -> unit 
+val get_class : state -> expr -> int

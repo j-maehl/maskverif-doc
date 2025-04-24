@@ -922,6 +922,16 @@ let build_obs_func ~ni ~trans ~glitch loc f =
 
   let all =
     E.He.fold (fun e _ interns -> E.Se.add e interns) obs E.Se.empty in
+
+  let stbl = E.He.create 1007 in 
+  let simplify_expr e = 
+    let e' = E.simplify_expr stbl e in
+    if not (E.E.equal e e') then 
+      E.He.add obs e' (E.He.find obs e);
+    e' in
+  let out = List.map (List.map simplify_expr) out in
+  let all = E.Se.map simplify_expr all in
+
   let interns, out =
     match ni with
     | `Threshold -> all, []
