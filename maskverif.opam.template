@@ -1,0 +1,29 @@
+opam-version: "2.0"
+
+homepage: "https://gitlab.com/benjgregoire/maskverif/"
+bug-reports: "https://gitlab.com/benjgregoire/maskverif/-/issues"
+dev-repo: "git+https://gitlab.com/benjgregoire/maskverif.git"
+license: "CeCILL-B"
+
+synopsis: "maskVerif: automatic tool for the verification of side-channel countermeasures"
+description: """
+maskVerif is a tool that was first designed in 2015 to
+automatically and formally verify higher-order masking
+implementations. Operating on pseudo-code in SSA form, it
+returns either a security proof in some chosen leakage model,
+or a list of potential attacks.
+
+In its latest version (available below), maskVerif is able
+to verify the following properties:
+
+ - t-probing security
+ - t-non-interference (t-NI)
+ - t-strong non-interference (t-SNI)
+
+in presence or in absence of glitches, or with transition
+without transition.
+
+It provides a small intermediate language for describing
+implementation but it can also take Verilog implementation as
+input.
+"""

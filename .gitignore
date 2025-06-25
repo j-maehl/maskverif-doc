@@ -1,6 +1,5 @@
-output/
-_build/
-main.native
-maskverif
-benchs/**/*.log
-
+/_opam/
+/_build/
+/output/
+/maskverif.exe
+/benchs/**/*.log

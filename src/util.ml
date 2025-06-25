@@ -56,7 +56,7 @@ let pp_enclose ~pre ~post pp fmt x =
   Format.fprintf fmt "%(%)%a%(%)" pre pp x post
 
 let pp_paren pp fmt x =
-  pp_enclose "(" ")" pp fmt x
+  pp_enclose ~pre:"(" ~post:")" pp fmt x
 
 let pp_if c pp1 pp2 fmt x =
   match c with

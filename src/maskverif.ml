@@ -22,10 +22,6 @@ module Parse = struct
   let parse_file = fun () ->
     MenhirLib.Convert.Simplified.traditional2revised Parser.file
 
-  type parser_t =
-    (P.token * L.position * L.position, unit list)
-      MenhirLib.Convert.revised
-
   let lexer lexbuf = fun () ->
     let token = Lexer.main lexbuf in
     (token, L.lexeme_start_p lexbuf, L.lexeme_end_p lexbuf)
@@ -51,9 +47,6 @@ module Parse = struct
 
 end
 (* ----------------------------------------------------------- *)
-
-open Checker
-
 let globals = Hashtbl.create 107
 
 type check_opt = {

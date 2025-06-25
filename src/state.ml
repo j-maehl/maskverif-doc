@@ -350,7 +350,7 @@ let apply_bij state r =
 
 exception Simplify1Done
 
-let rec simplify1 state =
+let simplify1 state =
   try
     while true do
       let r = Stack.pop state.s_todo in
