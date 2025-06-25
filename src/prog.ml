@@ -10,7 +10,20 @@ module E = Expr
 
 type var = E.var
 
-type expr =
+(* 
+   Type representing expressions in the intermediate language.
+   - Evar:    variable
+   - Econst:  constant value
+   - Eop1:    unary operator applied to an expression
+   - Eop2:    binary operator applied to two expressions
+   - Eop:     n-ary operator applied to a list of expressions
+   - Ebox:    boxed expression (for encapsulation or marking)
+
+   The type of expressions is used to represent the intermediate
+   representation of the program, which can be transformed and
+   optimized before being compiled to the final output. 
+*)
+type expr = 
   | Evar of var
   | Econst of E.constant
   | Eop1 of E.operator * expr 
@@ -37,7 +50,7 @@ type vcall = var list
 
 type vcalls = vcall list
 
-type fname = HS.t
+type fname = HS.t (* hash-consed string type *)
 
 type macro_call = { i_lhs : vcalls; i_macro: fname; i_args : vcalls }
 
@@ -115,31 +128,32 @@ let pp_assgn ?(full=dft_pinfo) fmt i =
      (pp_var ~full) i.i_var (pp_expr ~full) i.i_expr
 
 let pp_vars ?(full=dft_pinfo) fmt xs =
-  Format.fprintf fmt "@[<hov>%a@]" (pp_list ",@ " (pp_var ~full)) xs
+  Format.fprintf fmt "@[<hov>%a@]" (pp_list ",@ " (pp_var ~full)) xs (* Print a list of variables *)
 
 let pp_vcall ?(full=dft_pinfo) fmt xs =
-  Format.fprintf fmt "[%a]" (pp_vars ~full) xs
+  Format.fprintf fmt "[%a]" (pp_vars ~full) xs (* Print a variable call, which is a list of variables *)
 
 let pp_vcalls ?(full=dft_pinfo) fmt xs =
   Format.fprintf fmt "@[<hov>(%a)@]"
-    (pp_list ",@ " (pp_vcall ~full)) xs
+    (pp_list ",@ " (pp_vcall ~full)) xs (* Print a list of variable calls *)
 
 let pp_call ?(full=dft_pinfo) fmt i =
   Format.fprintf fmt "@[<hov 2> %a =@ %a%a@]"
-    (pp_vcalls ~full) i.i_lhs (HS.pp full.var_full) i.i_macro (pp_vcalls ~full) i.i_args
+    (pp_vcalls ~full) i.i_lhs (HS.pp full.var_full) i.i_macro (pp_vcalls ~full) i.i_args (* Print a macro call with its left-hand side, macro name, and arguments
+    *)
 
 let pp_exprs ?(full=dft_pinfo) fmt es =
   Format.fprintf fmt "@[<hov>%a@]"
-    (pp_list ",@ " (pp_expr ~full)) es
+    (pp_list ",@ " (pp_expr ~full)) es (* Print a list of expressions *)
 
 let pp_leak ?(full=dft_pinfo) fmt i =
   Format.fprintf fmt "@[<hov 2> leak %a |=@ (%a)@]"
-    (pp_var ~full) i.l_name (pp_exprs ~full) i.l_exprs
+    (pp_var ~full) i.l_name (pp_exprs ~full) i.l_exprs (* Print a leak instruction with its variable and expressions *)
 
 let pp_instr_d ?(full=dft_pinfo) fmt = function
-  | Iassgn i -> pp_assgn ~full fmt i
-  | Imacro i -> pp_call ~full fmt i
-  | Ileak i -> pp_leak ~full fmt i
+  | Iassgn i -> pp_assgn ~full fmt i (* Print an assignment instruction *)
+  | Imacro i -> pp_call ~full fmt i  (* Print a macro call instruction *)
+  | Ileak i -> pp_leak ~full fmt i   (* Print a leak instruction *)
 
 let pp_instr ?(full=dft_pinfo) fmt i =
   let pp_info fmt i = if full.print_info then i.instr_info fmt () in
@@ -180,21 +194,27 @@ let pp_prog ?(full=dft_pinfo) fmt prog =
 
 let error loc = error "Type error" (Some loc)
 
+(* Type alias for the global environment: a hash table mapping function names to their definitions *)
 type global_env = (string, func) Hashtbl.t
 
-let add_global globals func =
+(* Add a function to the global environment *)
+let add_global globals func = 
   Hashtbl.add globals func.f_name.hs_str func
 
+(* Retrieve a function from the global environment by its identifier *)
 let get_global globals id =
   try Hashtbl.find globals (data id)
   with Not_found ->
     error (loc id) "undeclared macro %a" P.pp_ident id
 
+(* Module for translating from Parsetree to Prog representation *)
 module ToProg = struct
+  (* Variable kind: either a single variable or a tuple of variables *)
   type vkind =
     | VKvar of var
     | VKtuple  of var list
 
+  (* Environment for translation, tracking globals, locals, others, and initialized variables *)
   type env = {
       globals: global_env;
       mutable locals : vkind P.Mid.t;
@@ -202,6 +222,7 @@ module ToProg = struct
       mutable init   : E.Sv.t
     }
 
+  (* Add a variable to the environment, optionally marking it as "other" *)
   let add_var other env id kind =
     if P.Mid.mem id env.locals then
       error (loc id) "multiple declaration of %a" P.pp_ident id;
@@ -210,6 +231,7 @@ module ToProg = struct
     | true, VKvar x -> env.others <- x::env.others
     | _ -> ()
 
+  (* Get all variables associated with an identifier *)
   let get_vars env id =
     let k =
       try P.Mid.find id env.locals
@@ -221,6 +243,7 @@ module ToProg = struct
     | VKvar x -> [x]
     | VKtuple xs -> xs
 
+  (* Ensure a variable call is single (not shared/tuple) *)
   let check_single loc id xs =
     match xs, id with
     | [x], _ -> x
@@ -229,16 +252,20 @@ module ToProg = struct
     | _, None ->
       error loc "shared variable not allowed here"
 
+  (* Get a single variable from the environment *)
   let get_var env id =
     check_single (loc id) (Some id) (get_vars env id)
 
+  (* Create a range of identifiers for indexed variables *)
   let mk_range id (i,j) =
     List.map (fun i -> {id with pl_data = (data id^ string_of_int i)})
       (mk_range_i i j)
 
+  (* Flatten a list of ranges *)
   let mk_rangen id rs =
     List.flatten (List.map (mk_range id) rs)
 
+  (* Get variables from a vcall (variable call) *)
   let get_vcall1 env vcall =
     match vcall with
     | P.Vid(id,None) -> get_vars env id
@@ -248,6 +275,7 @@ module ToProg = struct
     | P.Vtuple ids ->
       List.map (get_var env) (data ids)
 
+  (* Rotate a list left or right by i positions *)
   let rotate_xs dir xs i =
     let n = List.length xs in
     let i = i mod n in
@@ -260,6 +288,7 @@ module ToProg = struct
       let xs = Array.append xs2 xs1 in
       Array.to_list xs
 
+  (* Get variables from a vcall, possibly applying a shift left or right *)
   let get_vcall env (vc1, shf) =
     let xs = get_vcall1 env vc1 in
     match shf with
@@ -267,6 +296,7 @@ module ToProg = struct
     | Some (P.Sr i) -> rotate_xs `Right xs i
     | Some (P.Sl i) -> rotate_xs `Left xs i
 
+  (* Check that all variables in xs are initialized *)
   let check_init env loc xs =
     let l = List.filter (fun x -> not (E.Sv.mem x env.init)) xs in
     match l with
@@ -275,10 +305,12 @@ module ToProg = struct
     | xs  -> error loc "variables %a are not initialized"
                (pp_list ",@ " (pp_var ~full:dft_pinfo)) xs
 
+  (* Get an operator by name, or fail if not found *)
   let get_op op = 
     try E.Op.find (data op) 
     with Not_found -> error (loc op) "unknown operator : %s" (data op)
 
+  (* Check that an expression has the expected type *)
   let check_ty_e loc e ty = 
     match type_of_expr e with
     | Some ty' -> 
@@ -289,6 +321,7 @@ module ToProg = struct
       error loc "the expression should have type %s" 
         (E.ty2string ty)
 
+  (* Recursively translate a Parsetree expression to a Prog expression *)
   let rec to_expr env e =
     match data e with
     | P.Evar v ->
@@ -314,6 +347,7 @@ module ToProg = struct
     check_ty_e (loc e) e' ty;
     e'
  
+  (* Translate a Parsetree expression to a list of Prog expressions of length n *)
   let rec to_expr_n env n e =
     match data e with
     | P.Evar x ->
@@ -345,10 +379,11 @@ module ToProg = struct
     List.iter (fun e' -> check_ty_e (loc e) e' ty) e';
     e'
     
-
+  (* Mark a variable as initialized *)
   let set_init env x =
     env.init <- E.Sv.add x env.init
 
+  (* Get variable calls for function arguments, checking arity and initialization *)
   let get_vcalls env id vcalls pins ins =
     let pl1 = List.length pins in
     let l1 = List.length ins in
@@ -382,7 +417,7 @@ module ToProg = struct
     let ins = List.map2 (get_vcall) vcalls ins in
     pub @ ins
 
-
+  (* Set variable calls for function outputs, checking arity and initialization *)
   let set_vcalls env id vcalls outs =
     let l1 = List.length outs in
     let l2 = List.length vcalls in
@@ -403,6 +438,7 @@ module ToProg = struct
       xs in
     List.map2 (set_vcall) vcalls outs
 
+  (* Compute the set of variables used in an expression *)
   let vars =
     let rec aux fv = function
       | Evar x -> E.Sv.add x fv
@@ -412,6 +448,7 @@ module ToProg = struct
       | Ebox _ | Econst _ -> fv in
     aux E.Sv.empty
 
+  (* Check for parallel assignment conflicts *)
   let check_para loc is =
     let assigned = ref E.Sv.empty in
     let check i =
@@ -426,18 +463,20 @@ module ToProg = struct
       | _ -> assert false in
     List.iter check is
 
+  (* Pretty-print location info for instructions *)
   let pp_loc_info loc msg fmt () =
     if msg = "" then
       Format.fprintf fmt "(* %s *)@ " (Location.to_string loc)
     else 
       Format.fprintf fmt "@[<v>(* %s@    %s *)@]" (Location.to_string loc) msg
 
+  (* Create an instruction with location info *)
   let mk_instr loc ?(msg="") i = {
       instr_d = i;
       instr_info = pp_loc_info loc msg;
     }
 
-
+  (* Translate a Parsetree assignment to Prog instructions *)
   let to_assgn env i =
     let loc = loc i in
     let i = data i in
@@ -453,6 +492,7 @@ module ToProg = struct
       check_para (P.vcall_loc i.P.i_var) is;
       is
 
+  (* Check that two sets of variable calls are disjoint *)
   let check_disjoint id xss yss =
     let o = E.Hv.create 101 in
     let do1 x =
@@ -464,6 +504,7 @@ module ToProg = struct
     don xss;
     don yss
 
+  (* Translate a Parsetree macro call to Prog instructions *)
   let to_macro env i =
     let loc = loc i in
     let i = data i in
@@ -475,9 +516,11 @@ module ToProg = struct
     check_disjoint id i_args i_lhs;
     [mk_instr loc (Imacro { i_lhs; i_macro; i_args })]
 
+  (* Translate a list of Parsetree expressions to Prog expressions *)
   let get_lexprs env es =
     List.map (to_expr env) es
 
+  (* Translate a Parsetree leak instruction to Prog instructions *)
   let to_leak env i =
     let loc = loc i in
     let (i,msg) = data i in
@@ -486,12 +529,14 @@ module ToProg = struct
     set_init env lname;
     [mk_instr loc ~msg (Ileak { l_name = lname; l_exprs = les })]
 
+  (* Translate a Parsetree instruction to Prog instructions *)
   let to_instr env i =
     match (data i) with
     | P.Iassgn id -> to_assgn env (mkloc (loc i) id)
     | P.Imacro id -> to_macro env (mkloc (loc i) id)
     | P.Ileak (id,msg) -> to_leak env (mkloc (loc i) (id,msg))
 
+  (* Set random variables in the environment *)
   let set_rand env (id,orng, ty) =
     let doit id =
       let x = E.V.mk_var (data id) ty in
@@ -505,6 +550,7 @@ module ToProg = struct
       add_var false env id (VKtuple xs);
       xs
 
+  (* Set shared variables in the environment *)
   let set_shared other env (id,ids,ty) =
     let add id =
       let x = E.V.mk_var (data id) ty in
@@ -519,11 +565,13 @@ module ToProg = struct
     add_var other env id (VKtuple xs);
     x, xs
 
+  (* Set shared variables and mark them as initialized *)
   let set_shared_init other env ids =
     let (_, xs as xxs) = set_shared other env ids in
     List.iter (set_init env) xs;
     xxs
 
+  (* Initialize shared variables, randoms, and others for a function *)
   let init_shared globals func =
     let env = { globals = globals;
                 locals = P.Mid.empty;
@@ -538,6 +586,7 @@ module ToProg = struct
     let rnds = List.flatten (List.map (set_rand env) func.P.f_rand) in
     env, f_pin, f_in, f_ou, rnds
 
+  (* Translate a Parsetree function to a Prog function *)
   let to_func globals func =
     let f_name = HS.make (data func.P.f_name) in
     let env, f_pin, f_in, f_out, f_rand = init_shared globals func in
@@ -546,8 +595,11 @@ module ToProg = struct
     { f_name; f_pin; f_in; f_out; f_other; f_rand; f_cmd }
 
 end
-(* ------------------------------------------------------------------ *)
 
+(* ------------------------------------------------------------------ *)
+(* Module for processing and renaming variables in instructions *)
+
+(* Rename variables in expressions and instructions, using a substitution map *)
 module Process = struct
   let rename_var s x =
     try E.Hv.find s x with Not_found -> assert false
@@ -583,70 +635,85 @@ module Process = struct
 
   (* ------------------------------------------------------------------ *)
 
-  type env_expand = {
-      ee_globals : global_env;
-      mutable rnd : var list;
-      mutable other : var list;
+
+(* Macro expansion environment and functions *)
+
+(* Environment for macro expansion, tracking global functions, randoms, and others *)
+type env_expand = {
+      ee_globals : global_env;  (* Global environment: function name -> func *)
+      mutable rnd : var list;   (* List of random variables accumulated during expansion *)
+      mutable other : var list; (* List of "other" variables accumulated during expansion *)
     }
 
-  let get_macro env fname =
-    try Hashtbl.find env.ee_globals fname.hs_str
-    with Not_found -> assert false
+(* Retrieve a macro (function) definition from the environment by its name *)
+let get_macro env fname =
+  try Hashtbl.find env.ee_globals fname.hs_str
+  with Not_found -> assert false
 
-  let macro_expand_call ppi env i =
-    let func = get_macro env i.i_macro in
-    let s = E.Hv.create 57 in
-    let add x y = E.Hv.add s x y in
-    let adds xs ys = List.iter2 add xs ys in
-    (* FIXME: public args ... *)
-    List.iter2 adds
-      ((List.map (fun x -> [x]) func.f_pin) @
-       (List.map snd func.f_in)) i.i_args;
-    List.iter2 adds func.f_out i.i_lhs;
-    let add_clone x = let x' = E.V.clone x in add x x'; x' in
-    let add_rnd x   = let x' = add_clone x in env.rnd <- x'::env.rnd in
-    let add_other x = let x' = add_clone x in env.other <- x'::env.other in
-    List.iter add_rnd func.f_rand;
-    List.iter add_other func.f_other;
-    List.map (rename_i ppi s) func.f_cmd
+(* Expand a macro call instruction into a list of instructions *)
+let macro_expand_call ppi env i =
+  (* Look up the macro/function definition *)
+  let func = get_macro env i.i_macro in
+  (* Create a substitution table for variable renaming *)
+  let s = E.Hv.create 57 in  (* Substitution table: original var -> cloned var *)
+  let add x y = E.Hv.add s x y in
+  let adds xs ys = List.iter2 add xs ys in
+  (* Map arguments from call site to macro parameters *)
+  (* FIXME: public args ... *)
+  List.iter2 adds
+    ((List.map (fun x -> [x]) func.f_pin) @
+     (List.map snd func.f_in)) i.i_args;
+  (* Map macro outputs to call-site LHS *)
+  List.iter2 adds func.f_out i.i_lhs;
+  (* Clone and accumulate random and other variables *)
+  let add_clone x = let x' = E.V.clone x in add x x'; x' in
+  let add_rnd x   = let x' = add_clone x in env.rnd <- x'::env.rnd in
+  let add_other x = let x' = add_clone x in env.other <- x'::env.other in
+  List.iter add_rnd func.f_rand;
+  List.iter add_other func.f_other;
+  (* Rename variables in the macro body and return the expanded instructions *)
+  List.map (rename_i ppi s) func.f_cmd
 
-  let rec macro_expand_c env c =
-    match c with
-    | [] -> []
-    | { instr_d = Iassgn _ } as i :: c -> i :: macro_expand_c env c
-    | { instr_d = Imacro i} as ii :: c ->
-      let c = macro_expand_c env c in
-      let ic = macro_expand_call ii.instr_info env i in
-      ic@c
-    | { instr_d = Ileak _ } as i :: c -> i :: macro_expand_c env c
+(* Recursively expand all macro calls in a command list *)
+let rec macro_expand_c env c =
+  match c with
+  | [] -> []
+  | { instr_d = Iassgn _ } as i :: c -> i :: macro_expand_c env c
+  | { instr_d = Imacro i} as ii :: c ->
+    let c = macro_expand_c env c in
+    let ic = macro_expand_call ii.instr_info env i in
+    ic@c
+  | { instr_d = Ileak _ } as i :: c -> i :: macro_expand_c env c
 
-  let macro_expand_func globals func =
-    let env = {
-        ee_globals = globals;
-        other = func.f_other;
-        rnd   = func.f_rand;
-      } in
-    let c = macro_expand_c env func.f_cmd in
-    { func with
-      f_other = env.other;
-      f_rand  = env.rnd;
-      f_cmd   = c }
+(* Expand all macros in a function, updating its random and other variables *)
+let macro_expand_func globals func =
+  let env = {
+      ee_globals = globals;
+      other = func.f_other;
+      rnd   = func.f_rand;
+    } in
+  let c = macro_expand_c env func.f_cmd in
+  { func with
+    f_other = env.other;
+    f_rand  = env.rnd;
+    f_cmd   = c }
 
-  let func globals f =
-    let func = ToProg.to_func globals f in
-    let func = macro_expand_func globals func in
-    add_global globals func;
-    func
+(* Top-level function: translate a Parsetree function, expand macros, and add to globals *)
+let func globals f =
+  let func = ToProg.to_func globals f in
+  let func = macro_expand_func globals func in
+  add_global globals func;
+  func
 
 end
 
 (* ------------------------------------------------------------------ *)
 (* Buildind the set of possible observations *)
 (*
-  x = { e } // pas de glitches
-  x := e1 op e2 // genere des glitches
-  x != e   // stop les glitch
-  x <- e
+  x = { e } // no glitches
+  x := e1 op e2 // generate glitches
+  x != e   // stop the glitch
+  x <- e 
 *)
 
 let rec expr_of_pexpr e =
@@ -755,7 +822,7 @@ let rec build_obs ~trans ~glitch obs s c =
     let e = subst_e s i.i_expr in
     let pp fmt () =
       pp fmt ();
-      Format.fprintf fmt "(* from @[%a@] *)@ " (pp_expr ~full:dft_pinfo) e in
+      (* Format.fprintf fmt "(* from @[%a@] *)@ " (pp_expr ~full:dft_pinfo) e *) in
     let etrans =
       if trans then
         try Some (remove_top_not (expr_of_pexpr (E.Hv.find s i.i_var)))
@@ -943,14 +1010,14 @@ let build_obs_func ~ni ~trans ~glitch loc f =
      i.e if (e1,e2,e3), e1, (e1,e3) are in the set we keep only (e1,e2,e3),
      since the adversary can directly observes (e1,e2,e3) to get e1 or (e1,e3)
    *)
+   (* Pretty print all observable values *)
   let pp_elems =
     verbose 2 "@[<v>%a@]@." (pp_list "@ " E.pp_expr) in
 
   verbose 1 "number of internal observations = %i@." (E.Se.cardinal interns);
   pp_elems (E.Se.elements interns);
   let interns = remove_subtuple f.f_pin interns in
-  verbose 1 "after removing: number of internal observations = %i@."
-    (List.length interns);
+  verbose 1 "after removing: number of internal observations = %i@." (List.length interns);
   pp_elems interns;
   let fout = List.flatten out in
   verbose 1 "number of output observations = %i@." (List.length fout);
@@ -958,7 +1025,8 @@ let build_obs_func ~ni ~trans ~glitch loc f =
   (* Now build the list of Checker.expr_info *)
   let pp_e pp e fmt () =
     pp fmt ();
-    Format.fprintf fmt "@[%a@]@ " E.pp_expr e in
+     Format.fprintf fmt "@[%a@]@ " E.pp_expr e 
+    in
   let mk_ei e =
     { Checker.red_expr = e;
       Checker.pp_info =
@@ -972,9 +1040,17 @@ let build_obs_func ~ni ~trans ~glitch loc f =
 
 
 (* --------------------------------------------------------------- *)
+(* [threshold] transforms a function into its threshold version.
+   It generates initial random shares and sharing assignments for each input.
+   The function's name is suffixed with "_threshold", and its inputs, randoms,
+   and command list are updated accordingly.
+*)
 let threshold func =
-  let init = ref [] in
-  let rnds = ref [] in
+  let init = ref [] in      (* Accumulates initialization instructions *)
+  let rnds = ref [] in      (* Accumulates new random variables *)
+
+  (* For each variable [x], create a fresh random [r] and an assignment [x := r].
+     Add the assignment to [init] and the random to [rnds]. Return [Evar x]. *)
   let mk_rnd x =
     let r = E.V.clone x in
     rnds := r :: !rnds;
@@ -987,6 +1063,14 @@ let threshold func =
       } in
     init := i :: !init;
     Evar x in
+
+  (* For a shared input, create an assignment that sums the random shares and a clone of the original.
+     - x0: the first share variable
+     - x:  a clone of the original input variable
+     - es: list of expressions for the other shares
+     The assignment is x0 = x + sum(es), with kind IK_hide.
+     The instruction is added to [init].
+  *)
   let mk_shared x0 x es =
     let op = E.o_add x.E.v_ty in
     let i =
@@ -998,6 +1082,13 @@ let threshold func =
         instr_info = fun fmt () -> Format.fprintf fmt "(* sum share share *)@ "
       } in
     init := i :: !init in
+
+  (* For each input (x, xs), where xs are the shares:
+     - For each share except the first, create a random and assignment.
+     - Clone the original input x.
+     - The first share is set as the sum of the clone and the random shares.
+     - Returns (x, [x']), where x' is the clone of x.
+  *)
   let init_input (x,xs) =
     match xs with
     | [] -> assert false
@@ -1006,9 +1097,13 @@ let threshold func =
       let x' = E.V.clone x in
       mk_shared x0 x' es;
       (x,[x']) in
+
+  (* Process all function inputs to generate new input declarations and initialization code *)
   let f_in = List.map init_input func.f_in in
+
+  (* Return a new function record with updated name, inputs, randoms, and command list *)
   { func with
-    f_name = HS.make (func.f_name.hs_str ^ "_threshold");
+    f_name = HS.make (func.f_name.hs_str ^ "_threshold");  (* Suffix name *)
     f_in;
-    f_rand = List.rev_append !rnds func.f_rand;
-    f_cmd  = List.rev_append !init func.f_cmd }
+    f_rand = List.rev_append !rnds func.f_rand;            (* Add new randoms *)
+    f_cmd  = List.rev_append !init func.f_cmd }            (* Add new init code *)

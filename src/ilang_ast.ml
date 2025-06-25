@@ -1,5 +1,6 @@
 open Util
 
+(* ident is aliased to located, which is a record of value and location*)
 type ident = string located
 
 type attribute_arg =
@@ -52,6 +53,8 @@ type shares =
   | Svindex of ident * int list
   | Sindex of ident * int * int
   | Svect  of id_index list
+
+(* Seems to declare all nodes, e.g. cells and wires *)
 
 type decl =
   | Input  of ident option * shares

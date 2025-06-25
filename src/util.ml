@@ -348,16 +348,23 @@ exception ParseError of Location.t * string option
 exception LexicalError of Location.t option * string
 
 (* -------------------------------------------------------------------- *)
+(* 
+   Hash-consed string type and module.
+   This is used to efficiently represent and compare strings (such as identifiers)
+   by assigning each unique string a unique integer id.
+*)
+
 type hstring = {
-    hs_id : int;
-    hs_str : string;
+    hs_id : int;      (* Unique integer id for the string *)
+    hs_str : string;  (* The actual string value *)
   }
 
 module HS = struct
-  let id = ref 0
+  let id = ref 0  (* Counter for assigning unique ids *)
 
-  let tbl = Hashtbl.create 100
+  let tbl = Hashtbl.create 100  (* Table for string -> hstring mapping *)
 
+  (* Create or retrieve a hash-consed string for [s] *)
   let make s =
     try Hashtbl.find tbl s
     with Not_found ->
@@ -366,21 +373,24 @@ module HS = struct
       Hashtbl.add tbl s p;
       p
 
-  type t = hstring
+  type t = hstring  (* Alias for the hash-consed string type *)
 
+  (* Physical equality for fast comparison *)
   let equal s1 s2 = s1 == s2
 
+  (* Hash function based on the unique id *)
   let hash s = s.hs_id
 
+  (* Comparison function for ordering *)
   let compare s1 s2 = s1.hs_id - s2.hs_id
 
+  (* Pretty-printer for hash-consed strings.
+     If [full] is true, prints both the string and its id, otherwise just the string. *)
   let pp full fmt s = 
     if full then
       Format.fprintf fmt "%s#%i" s.hs_str s.hs_id
     else  Format.fprintf fmt "%s" s.hs_str
 end
-
-
 
 (* ----------------------------------------------------------------- *)
 

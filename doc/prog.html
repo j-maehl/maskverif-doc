@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Detailed Explanation of Functions in &DiacriticalGrave;prog&period;ml&DiacriticalGrave;</title>
+            <style>
+/* From extension vscode.github */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.vscode-dark img[src$=\#gh-light-mode-only],
+.vscode-light img[src$=\#gh-dark-mode-only],
+.vscode-high-contrast:not(.vscode-high-contrast-light) img[src$=\#gh-light-mode-only],
+.vscode-high-contrast-light img[src$=\#gh-dark-mode-only] {
+	display: none;
+}
+
+</style>
+            
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+<style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        <style>
+.task-list-item {
+    list-style-type: none;
+}
+
+.task-list-item-checkbox {
+    margin-left: -20px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+</style>
+<style>
+:root {
+  --color-note: #0969da;
+  --color-tip: #1a7f37;
+  --color-warning: #9a6700;
+  --color-severe: #bc4c00;
+  --color-caution: #d1242f;
+  --color-important: #8250df;
+}
+
+</style>
+<style>
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-note: #2f81f7;
+    --color-tip: #3fb950;
+    --color-warning: #d29922;
+    --color-severe: #db6d28;
+    --color-caution: #f85149;
+    --color-important: #a371f7;
+  }
+}
+
+</style>
+<style>
+.markdown-alert {
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid #888;
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0
+}
+
+.markdown-alert .markdown-alert-title {
+  display: flex;
+  font-weight: 500;
+  align-items: center;
+  line-height: 1
+}
+
+.markdown-alert .markdown-alert-title .octicon {
+  margin-right: 0.5rem;
+  display: inline-block;
+  overflow: visible !important;
+  vertical-align: text-bottom;
+  fill: currentColor;
+}
+
+.markdown-alert.markdown-alert-note {
+  border-left-color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-important {
+  border-left-color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-warning {
+  border-left-color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-tip {
+  border-left-color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-caution {
+  border-left-color: var(--color-caution);
+}
+
+.markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: var(--color-caution);
+}
+
+</style>
+        
+        </head>
+        <body class="vscode-body vscode-light">
+            <h1 id="detailed-explanation-of-functions-in-progml">Detailed Explanation of Functions in <code>prog.ml</code></h1>
+<p>The module <code>ToProg</code> inside <code>prog.ml</code> is the main transformer from parsed AST forms (from <code>parsetree.ml</code>) to the internal program representation used later for analysis and verification.</p>
+<hr>
+<h2 id="1-let-get_global-globals-id">1. <code>let get_global globals id</code></h2>
+<ul>
+<li><strong>Purpose</strong>: Look up a global function in the <code>globals</code> hashtable using the identifier <code>id</code>.</li>
+<li><strong>Process</strong>: Uses <code>Hashtbl.find</code> with the key data <code>id</code> (the string content).</li>
+<li><strong>Error handling</strong>: If not found, raises an error indicating &quot;undeclared macro&quot;.</li>
+<li><strong>Role</strong>: Ensures that macros or global functions referred to are declared before use.</li>
+</ul>
+<hr>
+<h2 id="2-types-inside-toprog-module">2. Types inside <code>ToProg</code> module</h2>
+<h3 id="vkind"><code>vkind</code></h3>
+<p>Tag for variable kind which can be:</p>
+<ul>
+<li><code>VKvar</code> of <code>var</code> (basic single variable).</li>
+<li><code>VKtuple</code> of <code>var list</code> (tuple of variables).</li>
+</ul>
+<h3 id="env-environment-record"><code>env</code> (environment record)</h3>
+<p>Holds:</p>
+<ul>
+<li><code>globals</code>: global functions env.</li>
+<li><code>locals</code>: map from identifiers to <code>vkind</code> (local variables).</li>
+<li><code>others</code>: list of other vars (usually for &quot;other&quot; variables).</li>
+<li><code>init</code>: set of initialized variables (to track initialization status).</li>
+</ul>
+<blockquote>
+<p>This environment records all locals and global references during translation.</p>
+</blockquote>
+<hr>
+<h2 id="3-add_var-other-env-id-kind">3. <code>add_var other env id kind</code></h2>
+<ul>
+<li>Adds a variable of kind <code>kind</code> bound to identifier <code>id</code> in the environment <code>env</code>.</li>
+<li>Checks if <code>id</code> is already in <code>env.locals</code> to avoid multiple declarations.</li>
+<li>Stores <code>kind</code> in <code>locals</code>.</li>
+<li>If <code>other</code> is true and <code>kind</code> is a single variable, adds it to <code>others</code>.</li>
+</ul>
+<blockquote>
+<p>Used to consistently manage local variable declarations and &quot;other&quot; variables.</p>
+</blockquote>
+<hr>
+<h2 id="4-get_vars-env-id">4. <code>get_vars env id</code></h2>
+<ul>
+<li>Retrieves the list of variables corresponding to an identifier <code>id</code>.</li>
+<li>Looks up <code>id</code> in local environment.</li>
+<li>If not found, creates a new variable initialized for <code>id</code> with width <code>E.w1</code> (bitwidth 1).</li>
+<li>Variables can be tuples (<code>VKtuple</code>), in which case all parts are returned.</li>
+</ul>
+<blockquote>
+<p>Ensures all variables referenced are declared in locals or created.</p>
+</blockquote>
+<hr>
+<h2 id="5-check_single-loc-id-xs">5. <code>check_single loc id xs</code></h2>
+<ul>
+<li>Checks that the list of variables <code>xs</code> contains exactly one variable.</li>
+<li>If there are multiple, this implies the variable is shared or a tuple.</li>
+<li>Throws an error if <code>id</code> is a shared variable but used where sharing is not allowed.</li>
+</ul>
+<blockquote>
+<p>Used mainly to ensure scalar variable usage in expressions or assignments where sharing tuples are invalid.</p>
+</blockquote>
+<hr>
+<h2 id="6-get_var-env-id">6. <code>get_var env id</code></h2>
+<ul>
+<li>Calls <code>get_vars</code> and then ensures exactly one variable is returned via <code>check_single</code>.</li>
+</ul>
+<blockquote>
+<p>Used for extracting singular variables in expressions and assignments.</p>
+</blockquote>
+<hr>
+<h2 id="7-mk_range-id-ij-and-mk_rangen-id-rs">7. <code>mk_range id (i,j)</code> and <code>mk_rangen id rs</code></h2>
+<ul>
+<li>Creates lists of identifiers representing ranges:
+<ul>
+<li><code>mk_range</code> creates identifiers with suffixes for indices from <code>i</code> to <code>j</code>.</li>
+<li><code>mk_rangen</code> applies <code>mk_range</code> to a list of ranges returning a flattened list.</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p>Helps expand array-like variable references or ranges in <code>id</code> for tuple sharing.</p>
+</blockquote>
+<hr>
+<h2 id="8-get_vcall1-env-vcall">8. <code>get_vcall1 env vcall</code></h2>
+<ul>
+<li>Retrieves the variable(s) referenced by a <code>vcall1</code> (which can be a single variable, ranged variables, or tuple).</li>
+<li>Resolves identifiers and expansions to a list of vars.</li>
+</ul>
+<hr>
+<h2 id="9-rotate_xs-dir-xs-i">9. <code>rotate_xs dir xs i</code></h2>
+<ul>
+<li>Rotates list <code>xs</code> by <code>i</code> positions either left or right.</li>
+</ul>
+<blockquote>
+<p>Used when variable calls (<code>vcall</code>) include shift annotations (e.g., slicing or rotating vectors).</p>
+</blockquote>
+<hr>
+<h2 id="10-get_vcall-env-vc1-shf">10. <code>get_vcall env (vc1, shf)</code></h2>
+<ul>
+<li>Expands variable call(s) by:
+<ul>
+<li>Getting variables for <code>vc1</code> via <code>get_vcall1</code>.</li>
+<li>Applying optional rotation/shifting <code>shf</code>.</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p>Returns the resulting list of variables.<br>
+Enables transforming parsed variable accesses with optional shifts into internal lists.</p>
+</blockquote>
+<hr>
+<h2 id="11-check_init-env-loc-xs">11. <code>check_init env loc xs</code></h2>
+<ul>
+<li>Checks whether all variables in <code>xs</code> are initialized (<code>env.init</code>).</li>
+<li>Raises errors for any uninitialized variable.</li>
+</ul>
+<hr>
+<h2 id="12-get_op-op">12. <code>get_op op</code></h2>
+<ul>
+<li>Looks up operator <code>op</code> by name using <code>E.Op.find</code>.</li>
+<li>Raises error if operator is unknown.</li>
+</ul>
+<blockquote>
+<p>Used to validate and resolve operator tokens during expression construction.</p>
+</blockquote>
+<hr>
+<h2 id="13-check_ty_e-loc-e-ty">13. <code>check_ty_e loc e ty</code></h2>
+<ul>
+<li>Checks at location <code>loc</code> that expression <code>e</code> has type <code>ty</code>.</li>
+<li>Uses <code>type_of_expr</code> helper to infer type.</li>
+<li>Reports type mismatch errors.</li>
+</ul>
+<hr>
+<h2 id="14-expression-constructors--mutually-recursive-functions">14. Expression Constructors — Mutually Recursive Functions</h2>
+<p>These recursively translate parsed expressions to internal expressions:</p>
+<h3 id="to_expr-env-e"><code>to_expr env e</code></h3>
+<ul>
+<li>Main expression converter from parsetree expr <code>e</code> to internal expr.</li>
+<li>Handles:
+<ul>
+<li><code>Evar v</code>: converts variables via <code>get_vcall</code>, ensures singleton, checks init.</li>
+<li><code>Econst</code>: wraps constants.</li>
+<li><code>Eop</code>: resolves operator and maps sub-expressions.</li>
+</ul>
+</li>
+<li>Calls <code>to_expr_ty</code> for typed expressions.</li>
+</ul>
+<h3 id="to_expr_ty-env-e-ty"><code>to_expr_ty env e ty</code></h3>
+<ul>
+<li>Calls <code>to_expr</code>, then checks its type matches <code>ty</code>.</li>
+</ul>
+<h3 id="to_expr_n-env-n-e"><code>to_expr_n env n e</code></h3>
+<ul>
+<li>Converts expression <code>e</code> into a list of <code>n</code> expressions.</li>
+<li>Handles vectorized operations or vector constants.</li>
+<li>Supports constant broadcasting.</li>
+</ul>
+<blockquote>
+<p>Used when expecting multiple shares/outputs.</p>
+</blockquote>
+<h3 id="to_expr_n_ty-env-n-e-ty"><code>to_expr_n_ty env n e ty</code></h3>
+<ul>
+<li>Like <code>to_expr_n</code> but with type checking on each element.</li>
+</ul>
+<hr>
+<h2 id="15-set_init-env-x">15. <code>set_init env x</code></h2>
+<ul>
+<li>Adds variable <code>x</code> to <code>env.init</code> to mark it as initialized.</li>
+</ul>
+<blockquote>
+<p>Used after assigning outputs or properly initialized variables in transformations.</p>
+</blockquote>
+<hr>
+<h2 id="16-get_vcalls-env-id-vcalls-pins-ins">16. <code>get_vcalls env id vcalls pins ins</code></h2>
+<ul>
+<li>Checks and translates inputs for function calls.</li>
+<li>Takes:
+<ul>
+<li><code>pins</code>: public input variables with types</li>
+<li><code>ins</code>: masked inputs with types</li>
+<li><code>vcalls</code>: variable calls from source program code</li>
+</ul>
+</li>
+<li>Validates argument count matches expected counts.</li>
+<li>Checks types for all variables.</li>
+<li>Checks initialization for shares.</li>
+</ul>
+<blockquote>
+<p>Returns a flat list of internal variables grouped combining <code>pins</code> and <code>ins</code>.<br>
+Used to bind formal parameters to actual arguments.</p>
+</blockquote>
+<hr>
+<h2 id="17-set_vcalls-env-id-vcalls-outs">17. <code>set_vcalls env id vcalls outs</code></h2>
+<ul>
+<li>Processes and validates output bindings for a function call.</li>
+<li>Checks lengths match between <code>outs</code> and <code>vcalls</code>.</li>
+<li>Marks all output variables as initialized.</li>
+<li>Checks type consistency between output variables and computed values.</li>
+</ul>
+<blockquote>
+<p>Returns list of variables bound on function outputs.<br>
+Ensures consistency and initialization after function calls.</p>
+</blockquote>
+<hr>
+<h2 id="18-vars-function">18. <code>vars</code> (function)</h2>
+<ul>
+<li>Recursively collects all variables (<code>Evar</code>) appearing in an expression.</li>
+<li>Returns a set of variables.</li>
+</ul>
+<blockquote>
+<p>Useful for dependency analysis and checking parallel assignments.</p>
+</blockquote>
+<hr>
+<h2 id="19-check_para-loc-is">19. <code>check_para loc is</code></h2>
+<ul>
+<li>Checks that parallel assignments described in list <code>is</code> are valid.</li>
+<li>Ensures variables on right-hand side are disjoint with left-hand side assigned variables to prevent illegal overlaps.</li>
+<li>Raises error on invalid shadowing.</li>
+</ul>
+<blockquote>
+<p>Enforces safe parallel assignment, crucial for soundness.</p>
+</blockquote>
+<hr>
+<h2 id="20-pp_loc_info-loc-msg">20. <code>pp_loc_info loc msg</code></h2>
+<ul>
+<li>Formats location and optional message for pretty-printing.</li>
+</ul>
+<blockquote>
+<p>Used in instructions to add source code position info in generated code.</p>
+</blockquote>
+<hr>
+<h2 id="21-mk_instr-loc-msg-i">21. <code>mk_instr loc ?msg i</code></h2>
+<ul>
+<li>Constructs an instruction record with data <code>i</code>.</li>
+<li>Annotates with location and optional message printer.</li>
+</ul>
+<blockquote>
+<p>Standardizes instruction construction preserving source location.</p>
+</blockquote>
+<hr>
+<h2 id="22-to_assgn-env-i">22. <code>to_assgn env i</code></h2>
+<ul>
+<li>Transforms a parsed assignment instruction (<code>i</code>) into internal representation.</li>
+<li>Converts left-hand side variables (possibly tuples or ranges) into internal variables.</li>
+<li>Converts right-hand side expressions to internal expressions respecting types and initialization.</li>
+<li>Builds internal <code>assgn</code> structures with type-checked variables and expressions.</li>
+<li>Checks/shifts/enforces initialization.</li>
+</ul>
+<blockquote>
+<p>Ensures that assignment statements are fully typed and properly tracked.</p>
+</blockquote>
+<hr>
+<h2 id="23-macro-expansion-workflow">23. Macro Expansion Workflow</h2>
+<p>Functions related to expanding macros and replacing them with sequences of instructions (<code>macro_expand_c</code>, <code>macro_expand_call</code>, etc.).</p>
+<ul>
+<li>Expansion performs inlining of macro commands recursively.</li>
+<li>Tracks generated <code>init</code> assignments to properly initialize variables.</li>
+<li>Converts macro calls into concrete instructions, removes dependence on macros post-expansion.</li>
+</ul>
+<blockquote>
+<p>Used to flatten macros for simpler downstream analyses.</p>
+</blockquote>
+<hr>
+<h2 id="24-macro_expand_func-globals-func">24. <code>macro_expand_func globals func</code></h2>
+<ul>
+<li>Expands macros in a function command sequence.</li>
+<li>Updates function environment to include new variables/rand variables.</li>
+<li>Returns expanded function without macro instructions, suitable for final analysis.</li>
+</ul>
+<hr>
+<h2 id="25-func-globals-f">25. <code>func globals f</code></h2>
+<ul>
+<li>The main entry point to convert raw function representation <code>f</code> into internal representation.</li>
+<li>Calls <code>ToProg.to_func</code> to transform AST function into internal <code>func</code>.</li>
+<li>Expands macros in the function.</li>
+<li>Adds the processed function to global environment.</li>
+</ul>
+<blockquote>
+<p>Returns the fully processed function.</p>
+</blockquote>
+<hr>
+<h2 id="summary-table-of-key-functions">Summary Table of Key Functions</h2>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Inputs</th>
+<th>Outputs</th>
+<th>Purpose &amp; Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_global globals id</code></td>
+<td>Global map, identifier</td>
+<td>Global function</td>
+<td>Lookup global function by name</td>
+</tr>
+<tr>
+<td><code>add_var other env id kind</code></td>
+<td>bool, env, id, vkind</td>
+<td>unit</td>
+<td>Add variable with kind to environment locals</td>
+</tr>
+<tr>
+<td><code>get_vars env id</code></td>
+<td>env, id</td>
+<td>var list</td>
+<td>Get or create list of vars for identifier</td>
+</tr>
+<tr>
+<td><code>get_var env id</code></td>
+<td>env, id</td>
+<td>var</td>
+<td>Get single var from identifier (error if tuple)</td>
+</tr>
+<tr>
+<td><code>to_expr env e</code></td>
+<td>env, AST expr</td>
+<td>internal expr</td>
+<td>Convert AST expression to typed internal expr</td>
+</tr>
+<tr>
+<td><code>to_expr_n env n e</code></td>
+<td>env, number, AST expr</td>
+<td>expr list</td>
+<td>Convert expression to a list of n expressions</td>
+</tr>
+<tr>
+<td><code>set_init env x</code></td>
+<td>env, var</td>
+<td>unit</td>
+<td>Mark variable as initialized in env</td>
+</tr>
+<tr>
+<td><code>get_vcalls env id vcalls pins ins</code></td>
+<td>env, id, vcalls, pins, ins</td>
+<td>var list</td>
+<td>Bind inputs to function call with type &amp; init checking</td>
+</tr>
+<tr>
+<td><code>set_vcalls env id vcalls outs</code></td>
+<td>env, id, vcalls, outs</td>
+<td>var list</td>
+<td>Bind output variables, mark initialized, check types</td>
+</tr>
+<tr>
+<td><code>vars</code></td>
+<td>expr</td>
+<td>var set</td>
+<td>Compute vars used in an expression</td>
+</tr>
+<tr>
+<td><code>check_para loc is</code></td>
+<td>location, instr list</td>
+<td>unit</td>
+<td>Validate parallel assignment safety</td>
+</tr>
+<tr>
+<td><code>macro_expand_c env c</code></td>
+<td>env, command list</td>
+<td>expanded commands</td>
+<td>Recursively expand macros to concrete instrs</td>
+</tr>
+<tr>
+<td><code>macro_expand_func globals func</code></td>
+<td>globals, func</td>
+<td>func</td>
+<td>Expand all macros in a function</td>
+</tr>
+<tr>
+<td><code>func globals f</code></td>
+<td>globals, raw func AST</td>
+<td>processed func</td>
+<td>Main function translation and macro expansion</td>
+</tr>
+</tbody>
+</table>
+
+            
+            
+        </body>
+        </html>

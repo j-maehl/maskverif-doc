@@ -1,0 +1,43 @@
+(* This is a comment *)
+(* ISW and
+   (a0, a1) is a sharing of a secret a = a0 + a1
+   (b0, b1) is a sharing of a secret b = b0 + b1
+   return (c0,c1) a sharing of a secret c = a * b 
+   c = (a0 + a1) * (b0 + b1) = 
+     = a0b0 + a1b1 + a0b1 + a1b0
+   IWS multiplication is done as follow
+
+   c0 = a0b0 + r0
+   c1 = a1b1 + ((r0 + a0b1) + a1b0) 
+*)
+
+proc ISW_AND:
+  (* The algorithm takes two inputs each split in two shares *)
+  inputs: a[0:1], b[0:1]
+  (* It return one input split in two shares *)
+  outputs: c[0:1]
+  (* r is a fresh random local to the algorithm *)
+  randoms: r;
+
+  c[0] := a[0] * b[0];
+  a0b1 := a[0] * b[1];
+  a1b0 := a[1] * b[0];
+  c[1] := a[1] * b[1];
+  aux  := r + a0b1;      (* r + a0*b1)            *)
+  aux  := aux + a1b0;    (* (r0 + a0*b1) + a1*b0) *) 
+  c[0] := c[0] + r;
+  c[1] := c[1] + aux;
+end
+
+(* Set the verbosity level *)
+verbose 1
+
+NI ISW_AND
+
+(* Check probing security without glitches *)
+noglitch Probing ISW_AND 
+
+(* To check with glitch, remove the "noglitch option" *)
+Probing ISW_AND 
+
+print ISW_AND

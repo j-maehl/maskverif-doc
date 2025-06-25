@@ -369,10 +369,12 @@ let pp_op aux fmt o es =
   else
     Format.fprintf fmt "%s" o.op_name
 
+    (* --------------------------------------------------------------------- *)
+    (* Pretty-printing *)
 let pp_expr fmt e =
   let rec aux top fmt e =
     match e.e_node with
-    | Etop            -> Format.fprintf fmt "TOP"
+    | Etop            -> Format.fprintf fmt "TOP" 
     | Ernd r          -> pp_rnd fmt r
     | Eshare(p,i,v)   -> pp_share fmt (p,i,v)
     | Epub x          -> pp_var fmt x

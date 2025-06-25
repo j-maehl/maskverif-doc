@@ -575,16 +575,16 @@ module ToProg = struct
 
   type envm = (var, E.var * P.expr) Hashtbl.t
 
-  let empty_envm () = Hashtbl.create 107
+  let empty_envm () = Hashtbl.create 107 (* create hashtable with 107 as random for indexing *)
 
   let mk_op op = HS.make op
 
-  let mk_var envm (s,i as x) =
+  let mk_var envm (s,i as x) = (* map hashtable to ILANG vars and expr. *)
     let xn =
       match i with
       | None -> s
       | Some i -> Format.sprintf "%s.[%i]" s i in
-    let v = E.V.mk_var xn w1 in
+    let v = E.V.mk_var xn w1 in 
     let e = P.Evar v in
     Hashtbl.add envm x (v,e);
     v

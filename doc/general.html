@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Comprehensive Documentation of the Project &mdash; All Files and Data Structures Explained</title>
+            <style>
+/* From extension vscode.github */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.vscode-dark img[src$=\#gh-light-mode-only],
+.vscode-light img[src$=\#gh-dark-mode-only],
+.vscode-high-contrast:not(.vscode-high-contrast-light) img[src$=\#gh-light-mode-only],
+.vscode-high-contrast-light img[src$=\#gh-dark-mode-only] {
+	display: none;
+}
+
+</style>
+            
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+<style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        <style>
+.task-list-item {
+    list-style-type: none;
+}
+
+.task-list-item-checkbox {
+    margin-left: -20px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+</style>
+<style>
+:root {
+  --color-note: #0969da;
+  --color-tip: #1a7f37;
+  --color-warning: #9a6700;
+  --color-severe: #bc4c00;
+  --color-caution: #d1242f;
+  --color-important: #8250df;
+}
+
+</style>
+<style>
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-note: #2f81f7;
+    --color-tip: #3fb950;
+    --color-warning: #d29922;
+    --color-severe: #db6d28;
+    --color-caution: #f85149;
+    --color-important: #a371f7;
+  }
+}
+
+</style>
+<style>
+.markdown-alert {
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid #888;
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0
+}
+
+.markdown-alert .markdown-alert-title {
+  display: flex;
+  font-weight: 500;
+  align-items: center;
+  line-height: 1
+}
+
+.markdown-alert .markdown-alert-title .octicon {
+  margin-right: 0.5rem;
+  display: inline-block;
+  overflow: visible !important;
+  vertical-align: text-bottom;
+  fill: currentColor;
+}
+
+.markdown-alert.markdown-alert-note {
+  border-left-color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-important {
+  border-left-color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-warning {
+  border-left-color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-tip {
+  border-left-color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-caution {
+  border-left-color: var(--color-caution);
+}
+
+.markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: var(--color-caution);
+}
+
+</style>
+        
+        </head>
+        <body class="vscode-body vscode-light">
+            <h1 id="comprehensive-documentation-of-the-project--all-files-and-data-structures-explained">Comprehensive Documentation of the Project — All Files and Data Structures Explained</h1>
+<hr>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ul>
+<li><a href="#1-overview">1. Overview</a></li>
+<li><a href="#2-file-by-file-explanation">2. File-by-File Explanation</a>
+<ul>
+<li><a href="#21-mainml">2.1. main.ml</a></li>
+<li><a href="#22-ilangml">2.2. ilang.ml</a></li>
+<li><a href="#23-checkerml">2.3. checker.ml</a></li>
+<li><a href="#24-stateml-data-structures-overview">2.4. state.ml (Data Structures Overview)</a></li>
+<li><a href="#25-parsetreeml-data-structures-overview">2.5. parsetree.ml (Data Structures Overview)</a></li>
+<li><a href="#26-progml-data-structures-and-functions">2.6. prog.ml (Data Structures and Functions)</a></li>
+</ul>
+</li>
+<li><a href="#3-summary-of-data-interactions">3. Summary of Data Interactions</a></li>
+<li><a href="#4-additional-notes">4. Additional Notes</a></li>
+</ul>
+<hr>
+<h2 id="1-overview">1. Overview</h2>
+<p>This documentation summarizes the architecture and internal workings of a system that processes masked cryptographic functions, verifies various security properties (like Non-Interference (NI), Strong Non-Interference (SNI), Threshold, etc.), and supports input from a custom intermediate language (ILANG). It includes:</p>
+<ul>
+<li>A REPL-style command interpreter.</li>
+<li>Parsing, lexing, and AST representation.</li>
+<li>Conversion to intermediate program representation.</li>
+<li>Symbolic internal state management.</li>
+<li>Checking algorithms with serial and parallel modes.</li>
+<li>A mechanism for macro expansion and detailed type/initialization checks.</li>
+</ul>
+<hr>
+<h2 id="2-file-by-file-explanation">2. File-by-File Explanation</h2>
+<hr>
+<h3 id="21-mainml">2.1. <code>main.ml</code></h3>
+<p><strong>Role:</strong><br>
+Main entry point implementing a REPL loop, command parsing, global state management, and dispatching function/operator loading and security property checks.</p>
+<p><strong>Key Data Structures:</strong></p>
+<ul>
+<li><code>globals : (func * check_opt) Hashtbl.t</code> — global mapping of loaded functions/operators and their associated checking options.</li>
+<li><code>check_opt</code> — record controlling glitch assumptions, transition usage, parallelism, and checking order.</li>
+</ul>
+<p><strong>Main Workflow:</strong></p>
+<ul>
+<li>Reads commands from <code>stdin</code> or files.</li>
+<li>Parses commands via Menhir parser wrapped in <code>Parse</code> functions.</li>
+<li>Processes commands with <code>process_command</code>:
+<ul>
+<li>Adding operators or functions (<code>add_operator</code>, <code>add_func</code>).</li>
+<li>Reading files or ILANG files (<code>process_file</code>, <code>Ilang.process_file</code>).</li>
+<li>Running security checks (<code>check_ni</code>, <code>check_sni</code>, <code>check_threshold</code>, <code>check_spini</code>).</li>
+<li>Changing verbosity or exiting.</li>
+</ul>
+</li>
+<li>Stores and retrieves functions/operators from <code>globals</code>.</li>
+<li>Proper error and parse error handling.</li>
+<li>Outputs results to stdout/stderr and continuously loops unless exited.</li>
+</ul>
+<hr>
+<h3 id="22-ilangml">2.2. <code>ilang.ml</code></h3>
+<p><strong>Role:</strong><br>
+Parsing and processing ILANG files (a specialized intermediate language format).</p>
+<p><strong>Main Function:</strong></p>
+<ul>
+<li><code>process_file : string -&gt; Prog.Process.func</code>
+<ul>
+<li>Parses an ILANG source file through <code>Parse.read_file</code>.</li>
+<li>Processes the AST into an intermediate module representation (<code>Process.process_prog</code>).</li>
+<li>Converts the processed module into a compatible internal function representation (<code>ToProg.func_of_mod</code>).</li>
+<li>Returns the resulting <code>func</code>.</li>
+</ul>
+</li>
+</ul>
+<p><strong>Usage:</strong><br>
+Called by <code>main.ml</code> on <code>Read_ilang</code> commands to incorporate ILANG definitions into the system.</p>
+<hr>
+<h3 id="23-checkerml">2.3. <code>checker.ml</code></h3>
+<p><strong>Role:</strong><br>
+Implements security property verification, including exhaustive search algorithms and parallelization.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li><strong><code>check_all</code></strong> — recursively explores tuples of load functions (ldfs) and applies bijection splitting and checking.</li>
+<li><strong><code>check_all_para</code></strong> — parallelized process-forking version using Unix processes, shared counters (<code>Shrcnt</code>), and pipes for synchronization and work distribution.</li>
+<li>Progress tracking and user feedback with timers and counters.</li>
+<li>Formatting helpers for output results (<code>pp_ok</code>, <code>pp_fail</code>).</li>
+<li>Selects between serial and parallel checks (<code>check_all_opt</code>) based on options.</li>
+</ul>
+<hr>
+<h3 id="24-stateml-data-structures-overview">2.4. <code>state.ml</code> (Data Structures Overview)</h3>
+<p><strong>Essential Types:</strong></p>
+<ul>
+<li><code>node</code>: Represents symbolic nodes in an expression graph; tracks children, descriptors, classes, and unique IDs.</li>
+<li><code>descriptor</code>: Categorizes <code>node</code> types (random vars, shares, operators, tuples, constants).</li>
+<li><code>class_parent</code>: Union-find style parent links for equivalence classes.</li>
+<li><code>Count.t</code>: Mutable counter type.</li>
+<li><code>Pinfo.t</code>: Tracks usage info for shares (used shares and count).</li>
+<li><code>state</code>: Global state for symbolic computation including stacks of randoms, private vars, todo nodes, bijections, params, and hash tables.</li>
+</ul>
+<hr>
+<h3 id="25-parsetreeml-data-structures-overview">2.5. <code>parsetree.ml</code> (Data Structures Overview)</h3>
+<p><strong>Core AST Types:</strong></p>
+<ul>
+<li><code>expr</code>: Variants <code>Evar</code>, <code>Econst</code>, and <code>Eop</code> represent variables, constants, and operator applications.</li>
+<li><code>vcall</code> and <code>vcall1</code>: Variable calls capturing variables or tuples with optional range shifts.</li>
+<li>Instructions including assignments, leaks, and macros.</li>
+<li>Functions (<code>func</code>) encapsulate input/output parameters, kind, commands, and variables.</li>
+<li><code>cmd</code>: List of instructions.</li>
+<li><code>ids</code>: Identifier lists or ranges used to compactly represent sets of variables.</li>
+</ul>
+<hr>
+<h3 id="26-progml-data-structures-and-functions">2.6. <code>prog.ml</code> (Data Structures and Functions)</h3>
+<h4 id="data-structures">Data Structures:</h4>
+<ul>
+<li><code>expr</code>: Internal typed expressions (<code>Evar</code>, <code>Econst</code>, unary <code>Eop1</code>, binary <code>Eop2</code>, n-ary <code>Eop</code>, boxed expressions).</li>
+<li><code>assgn</code>: Assignment instruction with variable, instruction kind (subst, hide etc.), and expression.</li>
+<li><code>vcall</code>, <code>vcalls</code>: Lists of variables representing tuples or multiple variable calls.</li>
+<li><code>macro_call</code>: Represents macro function invocations with multiple outputs and inputs.</li>
+<li><code>leak</code>: Represents explicit information leakage instructions.</li>
+<li><code>instr_d</code>, <code>instr</code>: Discriminated union of instruction types plus pretty-print info.</li>
+<li><code>cmd</code>: Sequence of instructions (command).</li>
+<li><code>func</code>: Central function representation, holding inputs, outputs, variables, commands, and kind.</li>
+<li><code>print_info</code>: Controls verbosity during pretty printing.</li>
+</ul>
+<h4 id="key-functions-and-their-roles">Key Functions and Their Roles:</h4>
+<ul>
+<li><code>get_global</code> — Lookup global function with error reporting.</li>
+<li>Environment management: <code>add_var</code>, <code>get_vars</code>, <code>get_var</code>, <code>check_single</code> manage variable declarations and expansions.</li>
+<li>Variable call translation: <code>get_vcall1</code>, <code>get_vcall</code> handle conversions from AST variable calls with range expansions and rotations.</li>
+<li><code>to_expr</code> and related recursive functions convert parsed AST expressions into internal expressions with type checking and initialization checks.</li>
+<li>Function call argument and output binding: <code>get_vcalls</code> and <code>set_vcalls</code>.</li>
+<li>Safety checks: <code>check_init</code> ensures variables are initialized before usage; <code>check_para</code> checks validity of parallel assignments.</li>
+<li>Macro expansion functions recursively inline macros into instruction lists (<code>macro_expand_c</code>, <code>macro_expand_func</code>).</li>
+<li><code>func</code> — Main entry converting parsed functions to internal representations, with macro expansion and consistency checks.</li>
+</ul>
+<hr>
+<h2 id="3-summary-of-data-interactions">3. Summary of Data Interactions</h2>
+<ul>
+<li><strong>Entry:</strong> <code>main.ml</code> handles commands and file input.</li>
+<li><strong>Parsing:</strong> <code>Parse</code> processes input to AST; <code>ilang.ml</code> processes ILANG to intermediate module and converts to internal func.</li>
+<li><strong>Conversion:</strong> <code>prog.ml</code> converts AST to typed expressions and instructions, performs macro expansion.</li>
+<li><strong>Symbolic State &amp; Checking:</strong> <code>state.ml</code> manages symbolic nodes; <code>checker.ml</code> runs property checks (sequential or parallel).</li>
+<li><strong>Outputs:</strong> Results and errors are formatted and printed in <code>main.ml</code> with tracing and verbose modes.</li>
+<li><strong>Global Data:</strong> Collected in <code>globals</code> hashtable, storing functions/operators accessible through the lifecycle.</li>
+</ul>
+<hr>
+<h2 id="4-additional-notes">4. Additional Notes</h2>
+<ul>
+<li>The project supports advanced security analyses on cryptographic masked constructions, focusing on verifying leakages.</li>
+<li>It carefully manages variable initialization and type safety at every translation step.</li>
+<li>Macro expansion eliminates syntactic sugar, easing analysis.</li>
+<li>Parallel checking leverages system-level forking and IPC for scalability.</li>
+<li>Pretty printing and detailed location tracking support diagnostic outputs and debugging.</li>
+<li>The system is extensible: new commands, operators, and functions can be added dynamically.</li>
+</ul>
+<hr>
+<h1 id="end-of-documentation">End of Documentation</h1>
+<hr>
+<p><strong>If you require additional detailed call-stack walkthroughs, example analyses on sample inputs, or explanations of auxiliary modules (<code>L</code>, <code>Util</code>, <code>Shrcnt</code>, etc.), please ask!</strong></p>
+
+            
+            
+        </body>
+        </html>
