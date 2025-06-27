@@ -2,12 +2,13 @@ open Util
 open Ilang_ast
 open Expr
 
+(* Parsing utilities for ILANG files *)
 module Parse = struct
 
   module P = Ilang_parser
   module L = Lexing
 
-
+  (* Create a lexbuf from a channel, setting file name and position *)
   let lexbuf_from_channel = fun name channel ->
     let lexbuf = Lexing.from_channel channel in
     lexbuf.Lexing.lex_curr_p <- {
@@ -18,6 +19,7 @@ module Parse = struct
       };
     lexbuf
 
+  (* Menhir parser entry point for ILANG programs *)
   let parserprog = fun () ->
     MenhirLib.Convert.Simplified.traditional2revised P.prog
 
@@ -25,20 +27,24 @@ module Parse = struct
     (P.token * L.position * L.position, unit list)
       MenhirLib.Convert.revised
 
+  (* Lexer wrapper: returns token and positions *)
   let lexer lexbuf = fun () ->
     let token = Ilang_lexer.main lexbuf in
     (token, L.lexeme_start_p lexbuf, L.lexeme_end_p lexbuf)
 
+  (* Parse from a channel *)
   let from_channel ~name channel =
     let lexbuf = lexbuf_from_channel name channel in
     parserprog () (lexer lexbuf)
 
+  (* Parse from a file, ensuring the channel is closed *)
   let from_file filename =
     let channel = open_in filename in
     finally
       (fun () -> close_in channel)
       (from_channel ~name:filename) channel
 
+  (* Read and parse an ILANG file *)
   let read_file filename =
     let decl = from_file filename in
     decl
@@ -47,8 +53,10 @@ end
 
 (* ----------------------------------------------------------- *)
 
+(* ILANG variable type: name and optional index *)
 type var = string * int option
 
+(* Supported operators in ILANG *)
 type operator =
   | Oand
   | Onot
@@ -58,17 +66,20 @@ type operator =
   | Off of Expr.operator
   | Oid
 
+(* Argument to an instruction: variable or constant *)
 type arg =
   | Avar of var
   | Aconst of string
 
+(* ILANG instruction *)
 type instr = {
-    i_dest : var;
-    i_op   : operator;
-    i_args : arg list;
-    i_attribute : attribute list * Location.t
+    i_dest : var;                (* Destination variable *)
+    i_op   : operator;           (* Operator *)
+    i_args : arg list;           (* Arguments *)
+    i_attribute : attribute list * Location.t  (* Attributes and location *)
   }
 
+(* ILANG module representation *)
 type ilang_module = {
   ilm_name     : string;
   ilm_randoms  : var list;
@@ -81,6 +92,7 @@ type ilang_module = {
   }
 
 (* ----------------------------------------------------------- *)
+(* Pretty-printers for ILANG variables, arguments, and instructions *)
 
 let pp_vident fmt i =
   Format.fprintf fmt "%s" i
@@ -117,6 +129,7 @@ let pp_instr fmt i =
   | _, _ -> assert false
 
 (* ----------------------------------------------------------------------- *)
+(* Processing and conversion of ILANG modules *)
 
 module Process = struct
 
@@ -136,12 +149,14 @@ module Process = struct
 
   module Hv = Hashtbl.Make(G.V)
 
+  (* Operator descriptor for mapping ILANG operators to internal representation *)
   type operator_desc = {
       o_input  : string list;
       o_output : string;
       o_desc   : operator;
     }
 
+  (* Table of known operators and their descriptors *)
   let op_decl = [
       "$_NOT_", { o_input = ["\\A";]; o_output = "\\Y"; o_desc = Onot };
       "$_XOR_", { o_input = ["\\A";"\\B"]; o_output = "\\Y"; o_desc = Oxor };
@@ -177,30 +192,33 @@ module Process = struct
     List.iter (fun (s,od) -> Hashtbl.add tbl s od) op_decl;
     tbl
 
+  (* Lookup operator descriptor by name *)
   let operator_desc s =
     try Hashtbl.find op_tbl (data s)
     with Not_found ->
       error "ilang:" (Some (loc s)) "unknown operator %s" (data s)
 
+  (* Vertex kind in the dataflow graph: wire or instruction *)
   type vertex_kind =
     | Vwire of var
     | Vinstr of instr
 
   type dir = Downto | Upto
 
+  (* Environment for module processing *)
   type env = {
-      vtbl : vertex_kind Hv.t;
-      itbl : (var,G.V.t) Hashtbl.t;
-      graph : G.t;
-      wire  : (string, int * dir) Hashtbl.t;
-      mutable winputs  : string list;
-      mutable woutputs : string list;
-      mutable randoms: var list;
-      mutable inppub: var list;
-      mutable inputs : (string option * var list) list;
-      mutable outpub: var list;
-      mutable outputs: (var list) list;
-      mutable others : var list;
+      vtbl : vertex_kind Hv.t;           (* Vertex table: vertex -> kind *)
+      itbl : (var,G.V.t) Hashtbl.t;      (* Variable -> vertex *)
+      graph : G.t;                       (* Dataflow graph *)
+      wire  : (string, int * dir) Hashtbl.t; (* Wire name -> (width, direction) *)
+      mutable winputs  : string list;    (* Input wire names *)
+      mutable woutputs : string list;    (* Output wire names *)
+      mutable randoms: var list;         (* Random variables *)
+      mutable inppub: var list;          (* Public input variables *)
+      mutable inputs : (string option * var list) list; (* Inputs *)
+      mutable outpub: var list;          (* Public output variables *)
+      mutable outputs: (var list) list;  (* Outputs *)
+      mutable others : var list;         (* Other variables *)
     }
 
   let empty_env () = {
@@ -217,6 +235,9 @@ module Process = struct
       outputs = [];
       others  = [];
     }
+
+  (* ----------------------------------------------------------- *)
+  (* Helper functions for processing wires, variables, declarations, etc. *)
 
   type wire_kind =
     | Kinput
@@ -472,28 +493,9 @@ module Process = struct
             G.add_edge env.graph v1 v2
           | Aconst _ -> () in
         List.iter add_arg i.i_args in
-(*    begin
-      try *)
     Hv.iter add_edge env.vtbl;
-(*      with G.Negative_cycle es ->
-        let pp_edges fmt e = pp_vertex env fmt (G.E.src e) in
-        Format.printf "@[<v>Cycle found@ %a@]@."
-           (pp_list "@ " pp_edges) es;
-        assert (es <> []);
-        assert false
-    end; *)
 
-    (* Build the list of instruction *)
-(*    let pp_vertex fmt v =
-      match Hv.find env.vtbl v with
-      | Vwire x -> Format.fprintf fmt "%i : input %a"
-                     (G.V.hash v) pp_var x
-      | Vinstr i -> Format.fprintf fmt "%i : %a "
-                      (G.V.hash v) pp_instr i in
-    let pp_edges v1 v2 =
-      Format.eprintf "%a -> %a@." pp_vertex v1 pp_vertex v2 in
-    G.iter_edges pp_edges env.graph; *)
-
+    (* Topological sort to produce instruction list *)
     let c = ref [] in
     let viewed = Hashtbl.create 1007 in
     let setv x =
@@ -567,7 +569,9 @@ module Process = struct
     process_module p.module_decl.wa_data
 
 end
+
 (* ----------------------------------------------------------- *)
+(* Conversion from ilang_module to Prog.func *)
 
 module ToProg = struct
   module E=Expr
@@ -604,10 +608,10 @@ module ToProg = struct
     try Hashtbl.find envm x
     with Not_found -> assert false
 
-
   let ksubst = Parsetree.IK_subst
   let kglitch = Parsetree.IK_glitch
 
+  (* Convert ILANG argument to Prog.expr *)
   let of_arg envm = function
     | Avar x -> snd (of_var envm x)
     | Aconst c -> 
@@ -617,6 +621,7 @@ module ToProg = struct
 
   let op_ff s = mk_op s
 
+  (* Convert ILANG operator and arguments to Prog.expr *)
   let to_expr envm op args =
     match op, List.map (of_arg envm) args with
     | Oand, [e1; e2] -> ksubst , P.Eop2(o_mulb, e1, e2)
@@ -632,6 +637,7 @@ module ToProg = struct
     | Oid , _        -> assert false
     | Oother o, es   -> ksubst , P.Eop(o, es)
 
+  (* Pretty-printers for attributes *)
   let pp_attribute_arg fmt = function
     | AA_int n -> Format.fprintf fmt "%i" n
     | AA_string s -> Format.fprintf fmt "%s" s
@@ -644,12 +650,14 @@ module ToProg = struct
       (pp_list "" pp_attribute) a
       (Location.to_string loc)
 
+  (* Convert ILANG instruction to Prog.instr *)
   let mk_instr envm i =
     let i_var = fst (of_var envm i.i_dest) in
     let i_kind, i_expr = to_expr envm i.i_op i.i_args in
     { P.instr_d = P.Iassgn P.{ i_var; i_kind; i_expr};
       P.instr_info = pp_attributes i.i_attribute }
 
+  (* Convert an ilang_module to a Prog.func *)
   let func_of_mod modul =
     let envm = empty_envm () in
     let f_name  = HS.make modul.ilm_name in
@@ -663,11 +671,11 @@ module ToProg = struct
     (* FIXME add public output *)
     P.{ f_name; f_pin; f_in; f_out; f_other; f_rand; f_cmd }
 
-
 end
 
 (* ----------------------------------------------------------- *)
 
+(* Entry point: process an ILANG file and return a Prog.func *)
 let process_file filename =
   let prog = Parse.read_file filename in
   let mod_ = Process.process_prog prog in

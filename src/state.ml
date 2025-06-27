@@ -2,15 +2,15 @@ open Util
 open Expr
 
 (* ----------------------------------------------------------------------- *)
-
+(* Definition of a computation node in the dataflow graph *)
 type node = {
-          node_id    : int;            (* uniq id for the node *)
-  mutable children   : node Vector.t;  (* List of nodes directly using it *)
-  mutable descriptor : descriptor;     (* The current value of the node *)
-          expr_desc  : expr;           (* Current expression representing
-                                          the node, and its original version *)
+          node_id    : int;            (* Unique id for the node *)
+  mutable children   : node Vector.t;  (* Nodes that use this node as input *)
+  mutable descriptor : descriptor;     (* The current value/type of the node *)
+          expr_desc  : expr;           (* The expression this node represents *)
 }
 
+(* The possible types of node descriptors *)
 and descriptor =
 | Top
 | Rnd   of rnd
@@ -20,9 +20,9 @@ and descriptor =
 | Op1   of operator * node 
 | Op2   of operator * node * node 
 | Tuple of bool * operator * node array
-  (* Invariant [Tuple(b,o,ns)]
-       if [b] is true there is no duplicate in the array [ns] *)
+  (* Invariant: Tuple(b,o,ns): if b is true, array ns has no duplicates *)
 
+(* Node identity and hashing for use in hash tables *)
 module N = struct
   type t = node
   let equal (n1:t) (n2:t) = n1.node_id == n2.node_id
@@ -31,11 +31,13 @@ end
 
 module Hn = Hashtbl.Make(N)
 
+(* Predicate: is this node a random node? *)
 let is_rnd node =
   match node.descriptor with
   | Rnd _ -> true
   | _     -> false
 
+(* Predicate: is this node a random node suitable for bijection? *)
 let is_rnd_for_bij n =
   Vector.size n.children = 1 && is_rnd n &&
     let c = Vector.top n.children in
@@ -51,11 +53,13 @@ let is_rnd_for_bij n =
       else false
     | _ -> false
 
+(* Predicate: is this node a share node? *)
 let is_share node =
   match node.descriptor with
   | Share _ -> true
   | _       -> false
 
+(* Special node representing the "top" of the computation graph *)
 let top_node = {
   node_id = -1;
   children = Vector.dummy ();
@@ -64,6 +68,7 @@ let top_node = {
 }
 
 (* ----------------------------------------------------------------------- *)
+(* Pretty-printers for descriptors and nodes *)
 
 let pp_descriptor fmt = function
   | Top            -> Format.fprintf fmt "TOP"
@@ -78,7 +83,6 @@ let pp_descriptor fmt = function
       (pp_list "@, "(fun fmt e -> Format.fprintf fmt "%i" e.node_id))
       (Array.to_list es)
 
-
 let pp_children fmt children =
   Vector.iter (fun c -> Format.fprintf fmt "%i;" c.node_id) children
 
@@ -89,28 +93,21 @@ let pp_node fmt node =
     pp_children node.children
     pp_expr node.expr_desc
 
-
 (* ----------------------------------------------------------------------- *)
-
+(* Counter for generating unique node ids *)
 module Count = struct
-
   type t = int ref
-
   let init () = ref (-1)
-
   let reset c = c := -1
-
   let next c = incr c; !c
-
 end
 
 (* ----------------------------------------------------------------------- *)
-
+(* Information about shares for a parameter *)
 module Pinfo = struct
-
   type t = {
-    mutable nb_used_shares : int;
-            p_shares       : node Stack.t;
+    mutable nb_used_shares : int;   (* Number of shares in use *)
+            p_shares       : node Stack.t;  (* Stack of share nodes *)
   }
 
   let init nb_params = {
@@ -132,25 +129,23 @@ module Pinfo = struct
   let clear info =
     info.nb_used_shares <- 0;
     Stack.clear info.p_shares
-
 end
 
 (* ----------------------------------------------------------------------- *)
-
+(* State of the computation graph *)
 type state = {
-    s_nb_shares: int;
-    s_count    : Count.t;
-    s_hash     : node He.t;
-    s_params   : Pinfo.t Hv.t;
-    s_randoms  : node Stack.t;  (* random nodes *)
-    s_todo     : node Stack.t;  (* next random to eliminate *)
-    s_top      : node Vector.t; (* parents of top *)
-    s_bij      : (node*node) Stack.t;
+    s_nb_shares: int;                (* Number of shares *)
+    s_count    : Count.t;            (* Node id counter *)
+    s_hash     : node He.t;          (* Hash table: expr -> node *)
+    s_params   : Pinfo.t Hv.t;       (* Table: param -> share info *)
+    s_randoms  : node Stack.t;       (* Stack of random nodes *)
+    s_todo     : node Stack.t;       (* Stack of next randoms to eliminate *)
+    s_top      : node Vector.t;      (* List of top nodes *)
+    s_bij      : (node*node) Stack.t;(* Stack of bijections *)
   }
 
-
+(* Initialize a new state *)
 let init_state nb_shares params =
-
   let s_count = Count.init () in
 
   (* Create the node corresponding to each share *)
@@ -158,12 +153,10 @@ let init_state nb_shares params =
   List.iter (fun p ->
     let p_info = Pinfo.init nb_shares in
     Hv.add s_params p p_info) params;
-
-  (* Add top to the hash table *)
+  (* Add top node to hash table *)
   let s_hash = He.create 1000 in
   He.add s_hash top top_node;
-
-  (* Build the final state *)
+  (* Build the final state record *)
   { s_nb_shares = nb_shares;
     s_count;
     s_hash;
@@ -174,6 +167,7 @@ let init_state nb_shares params =
     s_bij  = Stack.make 100 (top_node, top_node);
   }
 
+(* Reset/clear the state *)
 let clear_state state =
   Count.reset state.s_count;
   He.clear state.s_hash;
@@ -183,11 +177,13 @@ let clear_state state =
   Vector.clear state.s_top;
   Stack.clear state.s_bij
 
+(* Get the list of top-level expressions *)
 let get_top state =
   let ns = Vector.to_list state.s_top in
   List.map (fun n -> n.expr_desc) ns
 
 (* ----------------------------------------------------------------------- *)
+(* Pretty-printers for state and node ids *)
 
 let pp_node_id fmt n = Format.fprintf fmt "%i" n.node_id
 
@@ -214,6 +210,7 @@ let pp_state fmt state =
   Format.fprintf fmt "@]"
 
 (* ----------------------------------------------------------------------- *)
+(* Share and random node management *)
 
 let add_used_share state p =
   Pinfo.incr (Hv.find state.s_params p)
@@ -227,6 +224,7 @@ let declare_share state p n =
 let declare_random state n =
   Stack.push state.s_randoms n
 
+(* Add a child node to a parent node, updating share usage if needed *)
 let add_children state p c =
   begin match p.descriptor with
   | Share(x,_,_) when Vector.size p.children = 0 ->
@@ -235,6 +233,7 @@ let add_children state p c =
   end;
   Vector.push p.children c
 
+(* Set the parents of a node based on its descriptor *)
 let set_parents state n =
   match n.descriptor with
   | Rnd _ | Share _ | Pub _ | Top | Const _ -> ()
@@ -255,6 +254,7 @@ let set_parents state n =
           (Hn.add tbl p (); add_children state p n)
       done
 
+(* Recursively add an expression to the state, building its node and parents *)
 let rec add_expr state e =
   try He.find state.s_hash e
   with Not_found ->
@@ -292,14 +292,14 @@ let rec add_expr state e =
     n
 
 (* ----------------------------------------------------------------------- *)
-
+(* Initialize the todo stack with random nodes that have only one child *)
 let init_todo state =
   Stack.iter (fun n ->
       if Vector.size n.children = 1 then Stack.push state.s_todo n)
              state.s_randoms
 
 (* ----------------------------------------------------------------------- *)
-
+(* Remove a child node from a parent, and possibly remove the parent if unused *)
 let rec remove_child state p c =
   Vector.remove (N.equal c) p.children;
   match Vector.size p.children with
